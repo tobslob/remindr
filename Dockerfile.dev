@@ -1,0 +1,16 @@
+FROM golang:1.26-alpine
+
+WORKDIR /app
+
+# Install Air
+RUN go install github.com/air-verse/air@latest
+
+# Cache dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy the rest of the source code
+COPY . .
+
+# Air uses the .air.toml file in the root
+CMD ["air", "-c", ".air.toml"]

@@ -1,0 +1,15 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8081:8080"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    # Use this if you have a database service
+    # depends_on:
+    #   db:
+    #     condition: service_healthy
