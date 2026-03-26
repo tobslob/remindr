@@ -1,0 +1,2 @@
+ALTER TABLE items
+ADD COLUMN status TEXT DEFAULT 'todo';
