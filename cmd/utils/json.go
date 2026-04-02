@@ -2,6 +2,8 @@ package utils
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 )
 
@@ -18,7 +20,13 @@ func ReadJson(w http.ResponseWriter, r *http.Request, data any) error {
 
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
-	return decoder.Decode(data)
+	if err := decoder.Decode(data); err != nil {
+		if err == io.EOF {
+			return errors.New("body must not be empty")
+		}
+		return err
+		}
+	return nil
 }
 
 func ErrorJson(w http.ResponseWriter, status int, message string) error {
