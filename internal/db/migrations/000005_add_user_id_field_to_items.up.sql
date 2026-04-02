@@ -1,0 +1,2 @@
+ALTER TABLE items
+ADD COLUMN user_id UUID NOT NULL REFERENCES users(id);

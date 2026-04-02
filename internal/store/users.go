@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type UserStore struct {
@@ -11,7 +13,7 @@ type UserStore struct {
 }
 
 type User struct {
-	ID        string
+	ID        uuid.UUID
 	Username  string
 	Email     string
 	Password  string
@@ -41,7 +43,7 @@ func (s *UserStore) Create(ctx context.Context, user *User) error {
 	return nil
 }
 
-func (s *UserStore) GetByID(ctx context.Context, id string) (*User, error) {
+func (s *UserStore) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	query := `SELECT id, username, email, password, created_at, updated_at FROM users WHERE id = $1`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
@@ -89,7 +91,7 @@ func (s *UserStore) GetByEmail(ctx context.Context, email string) (*User, error)
 	return user, nil
 }
 
-func (s *UserStore) DeleteByID(ctx context.Context, id string) error {
+func (s *UserStore) DeleteByID(ctx context.Context, id uuid.UUID) error {
 	query := `DELETE FROM users WHERE id = $1`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)

@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 var (
@@ -15,9 +17,9 @@ var (
 
 type Users interface {
 	Create(context.Context, *User) error
-	GetByID(context.Context, string) (*User, error)
+	GetByID(context.Context, uuid.UUID) (*User, error)
 	GetByEmail(context.Context, string) (*User, error)
-	DeleteByID(context.Context, string) error
+	DeleteByID(context.Context, uuid.UUID) error
 	UpdateByID(context.Context, *User) error
 }
 
