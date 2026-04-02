@@ -49,6 +49,12 @@ func (app *application) mount() http.Handler {
 		r.Route("/items", func(r chi.Router) {
 			r.Use(app.AuthMiddleware)
 			r.Post("/", app.CreateItemHandler)
+			r.Get("/{id}", app.GetItemByIDHandler)
+			r.Get("/", app.GetItemsHandler)
+			r.Put("/{id}", app.UpdateItemHandler)
+			r.Delete("/{id}", app.DeleteItemHandler)
+			r.Delete("/", app.DeleteByUserIDHandler)
+			r.Delete("/bulk", app.DeleteByIDsHandler)
 		})
 	})
 

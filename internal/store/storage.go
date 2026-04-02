@@ -25,12 +25,12 @@ type Users interface {
 
 type Items interface {
 	Create(context.Context, *Item) error
-	GetByID(context.Context, string) (*Item, error)
-	GetAll(context.Context, string) ([]*Item, error)
-	DeleteByID(context.Context, string) error
-	DeleteAllByUserID(context.Context, string) error
-	DeleteByIDs(context.Context, []string) error
-	UpdateByID(context.Context, *Item) error
+	GetByID(context.Context, uuid.UUID, uuid.UUID) (*Item, error)
+	GetItems(context.Context, uuid.UUID) ([]*Item, error)
+	DeleteByID(context.Context, uuid.UUID, uuid.UUID) error
+	DeleteAllByUserID(context.Context, uuid.UUID) error
+	DeleteByIDs(context.Context, []uuid.UUID, uuid.UUID) error
+	UpdateByID(context.Context, uuid.UUID, *Item) error
 }
 
 type Storage struct {

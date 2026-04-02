@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -47,6 +48,10 @@ func (app *application) CreateUserHandler(w http.ResponseWriter, r *http.Request
 	ctx := r.Context()
 
 	if err := app.store.Users.Create(ctx, user); err != nil {
+		if errors.Is(err, store.ErrConflict) {
+			utils.ConflictErr(w, r, err)
+			return
+		}
 		utils.InternalServerError(w, r, err)
 		return
 	}
@@ -73,17 +78,16 @@ func (app *application) LoginUserHandler(w http.ResponseWriter, r *http.Request)
 
 	user, err := app.store.Users.GetByEmail(ctx, login.Email)
 	if err != nil {
-		if err == store.ErrNotFound {
-			utils.NotFoundError(w, r, err)
-		} else {
-			utils.InternalServerError(w, r, err)
+		if errors.Is(err, store.ErrNotFound) {
+			utils.UnauthorizedError(w, r, errors.New("invalid email or password"))
+			return
 		}
+		utils.InternalServerError(w, r, err)
 		return
 	}
 
-	ok := utils.CheckPassword(login.Password, user.Password)
-	if !ok {
-		utils.UnauthorizedError(w, r, err)
+	if ok := utils.CheckPassword(login.Password, user.Password); !ok {
+		utils.UnauthorizedError(w, r, errors.New("invalid email or password"))
 		return
 	}
 
@@ -94,6 +98,10 @@ func (app *application) LoginUserHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	token, _, err := app.tokenMaker.CreateToken(user.ID, expirationTime)
+	if err != nil {
+		utils.InternalServerError(w, r, err)
+		return
+	}
 
 	if err := utils.JsonResponse(w, http.StatusOK, map[string]any{"token": token}); err != nil {
 		utils.InternalServerError(w, r, err)

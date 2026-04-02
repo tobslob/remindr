@@ -53,14 +53,14 @@ func (s *ItemStore) Create(ctx context.Context, item *Item) error {
 	return nil
 }
 
-func (s *ItemStore) GetByID(ctx context.Context, id string) (*Item, error) {
-	query := `SELECT id, user_id, title, description, status, created_at, updated_at FROM items WHERE id = $1`
+func (s *ItemStore) GetByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*Item, error) {
+	query := `SELECT id, user_id, title, description, status, created_at, updated_at FROM items WHERE id = $1 AND user_id = $2`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
 	item := &Item{}
-	if err := s.db.QueryRowContext(ctx, query, id).Scan(
+	if err := s.db.QueryRowContext(ctx, query, id, userID).Scan(
 		&item.ID,
 		&item.UserID,
 		&item.Title,
@@ -78,7 +78,7 @@ func (s *ItemStore) GetByID(ctx context.Context, id string) (*Item, error) {
 	return item, nil
 }
 
-func (s *ItemStore) GetAll(ctx context.Context, userID string) ([]*Item, error) {
+func (s *ItemStore) GetItems(ctx context.Context, userID uuid.UUID) ([]*Item, error) {
 	query := `SELECT id, user_id, title, description, status, created_at, updated_at FROM items WHERE user_id = $1`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
@@ -109,13 +109,13 @@ func (s *ItemStore) GetAll(ctx context.Context, userID string) ([]*Item, error) 
 	return items, nil
 }
 
-func (s *ItemStore) DeleteByID(ctx context.Context, id string) error {
-	query := `DELETE FROM items WHERE id = $1`
+func (s *ItemStore) DeleteByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
+	query := `DELETE FROM items WHERE id = $1 AND user_id = $2`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	res, err := s.db.ExecContext(ctx, query, id)
+	res, err := s.db.ExecContext(ctx, query, id, userID)
 	if err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ func (s *ItemStore) DeleteByID(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *ItemStore) DeleteAllByUserID(ctx context.Context, userID string) error {
+func (s *ItemStore) DeleteAllByUserID(ctx context.Context, userID uuid.UUID) error {
 	query := `DELETE FROM items WHERE user_id = $1`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
@@ -155,13 +155,13 @@ func (s *ItemStore) DeleteAllByUserID(ctx context.Context, userID string) error 
 	return nil
 }
 
-func (s *ItemStore) DeleteByIDs(ctx context.Context, ids []string) error {
-	query := `DELETE FROM items WHERE id = ANY($1)`
+func (s *ItemStore) DeleteByIDs(ctx context.Context, ids []uuid.UUID, userID uuid.UUID) error {
+	query := `DELETE FROM items WHERE id = ANY($1) AND user_id = $2`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	res, err := s.db.ExecContext(ctx, query, pq.Array(ids))
+	res, err := s.db.ExecContext(ctx, query, pq.Array(ids), userID)
 	if err != nil {
 		return err
 	}
@@ -178,8 +178,8 @@ func (s *ItemStore) DeleteByIDs(ctx context.Context, ids []string) error {
 	return nil
 }
 
-func (s *ItemStore) UpdateByID(ctx context.Context, item *Item) error {
-	query := `UPDATE items SET title = $1, description = $2, status = $3, updated_at = NOW() WHERE id = $4`
+func (s *ItemStore) UpdateByID(ctx context.Context, userID uuid.UUID, item *Item) error {
+	query := `UPDATE items SET title = $1, description = $2, status = $3, updated_at = NOW() WHERE id = $4 AND user_id = $5`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
@@ -191,6 +191,7 @@ func (s *ItemStore) UpdateByID(ctx context.Context, item *Item) error {
 		item.Description,
 		item.Status,
 		item.ID,
+		item.UserID,
 	)
 	if err != nil {
 		return err
