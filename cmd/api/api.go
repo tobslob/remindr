@@ -7,12 +7,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/tobslob/todoApp/cmd/tokens"
 	"github.com/tobslob/todoApp/internal/store"
 )
 
 type application struct {
 	config config
 	store  *store.Storage
+	tokenMaker tokens.Maker
 }
 
 type config struct{
@@ -21,6 +23,7 @@ type config struct{
 	dbMaxOpenConns int
 	dbMaxIdleConns int
 	dbMaxIdleTime  string
+	TokenSecretKey string
 }
 
 func (app *application) mount() http.Handler {
@@ -38,6 +41,15 @@ func (app *application) mount() http.Handler {
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/healthz", app.healthCheckHandler)
+		r.Route("/users", func(r chi.Router) {
+			r.Post("/register", app.CreateUserHandler)
+			r.Post("/login", app.LoginUserHandler)
+		})
+
+		r.Route("/items", func(r chi.Router) {
+			r.Use(app.AuthMiddleware)
+			r.Post("/", app.CreateItemHandler)
+		})
 	})
 
 	return r
