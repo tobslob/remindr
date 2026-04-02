@@ -1,17 +1,13 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/tobslob/todoApp/cmd/utils"
+	"github.com/tobslob/todoApp/internal/requestctx"
 )
-
-type userKey string
-
-const USERCTX userKey = "user"
 
 func (app *application) AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -35,7 +31,7 @@ func (app *application) AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), USERCTX, user)
+		ctx := requestctx.WithUser(r.Context(), user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
