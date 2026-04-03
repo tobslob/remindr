@@ -23,24 +23,24 @@ type Users interface {
 	UpdateByID(context.Context, *User) error
 }
 
-type Items interface {
-	Create(context.Context, *Item) error
-	GetByID(context.Context, uuid.UUID, uuid.UUID) (*Item, error)
-	GetItems(context.Context, uuid.UUID) ([]*Item, error)
+type Tasks interface {
+	Create(context.Context, *Task) error
+	GetByID(context.Context, uuid.UUID, uuid.UUID) (*Task, error)
+	GetTasks(context.Context, uuid.UUID) ([]*Task, error)
 	DeleteByID(context.Context, uuid.UUID, uuid.UUID) error
 	DeleteAllByUserID(context.Context, uuid.UUID) error
 	DeleteByIDs(context.Context, []uuid.UUID, uuid.UUID) error
-	UpdateByID(context.Context, uuid.UUID, *Item) error
+	UpdateByID(context.Context, uuid.UUID, *Task) error
 }
 
 type Storage struct {
 	Users
-	Items
+	Tasks
 }
 
 func NewStorage(db *sql.DB) *Storage {
 	return &Storage{
 		Users: &UserStore{db: db},
-		Items: &ItemStore{db: db},
+		Tasks: &TaskStore{db: db},
 	}
 }

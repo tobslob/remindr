@@ -46,13 +46,13 @@ func (app *application) mount() http.Handler {
 			r.Post("/login", app.LoginUserHandler)
 		})
 
-		r.Route("/items", func(r chi.Router) {
+		r.Route("/tasks", func(r chi.Router) {
 			r.Use(app.AuthMiddleware)
-			r.Post("/", app.CreateItemHandler)
-			r.Get("/{id}", app.GetItemByIDHandler)
-			r.Get("/", app.GetItemsHandler)
-			r.Put("/{id}", app.UpdateItemHandler)
-			r.Delete("/{id}", app.DeleteItemHandler)
+			r.Post("/", app.CreateTaskHandler)
+			r.Get("/{id}", app.GetTaskByIDHandler)
+			r.Get("/", app.GetTasksHandler)
+			r.Patch("/{id}", app.UpdateTaskHandler)
+			r.Delete("/{id}", app.DeleteTaskHandler)
 			r.Delete("/", app.DeleteByUserIDHandler)
 			r.Delete("/bulk", app.DeleteByIDsHandler)
 		})
