@@ -1,0 +1,2 @@
+ALTER TABLE items
+ALTER COLUMN priority ADD NOT NULL;

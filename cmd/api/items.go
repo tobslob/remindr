@@ -9,8 +9,9 @@ import (
 )
 
 type CreateItemPayload struct {
-	Title       string `json:"title" validate:"required"`
-	Description string `json:"description" validate:"required"`
+	Title       string 	`json:"title" validate:"required"`
+	Description string 	`json:"description" validate:"required"`
+	Priority 		*string `json:"priority" validate:"omitempty,oneof=low medium high"`
 }
 
 func (app *application) CreateItemHandler(w http.ResponseWriter, r *http.Request) {
@@ -32,11 +33,17 @@ func (app *application) CreateItemHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if payload.Priority == nil {
+    p := "medium"
+    payload.Priority = &p
+	}
+
 	item := &store.Item{
 		UserID:      user.ID,
 		Title:       payload.Title,
 		Description: payload.Description,
 		Status:      store.Todo,
+		Priority: 	 payload.Priority,
 	}
 
 	ctx := r.Context()
