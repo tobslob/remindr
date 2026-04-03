@@ -65,10 +65,23 @@ func (app *application) GetTasksHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	paginationQuery, err := utils.GetPaginationFromQuery(r)
+	if err != nil {
+		utils.BadRequestError(w, r, err)
+		return
+	}
+
 	ctx := r.Context()
 
-	tasks, err := app.store.Tasks.GetTasks(ctx, user.ID)
+	tasks, err := app.store.Tasks.GetTasks(ctx, user.ID, store.PaginationFilter{
+		LastID: paginationQuery.LastID,
+		Limit:  paginationQuery.Limit,
+	})
 	if err != nil {
+		if errors.Is(err, store.ErrInvalidCursor) {
+			utils.BadRequestError(w, r, err)
+			return
+		}
 		utils.InternalServerError(w, r, err)
 		return
 	}
@@ -182,7 +195,7 @@ func (app *application) UpdateTaskHandler(w http.ResponseWriter, r *http.Request
 		Title:       payload.Title,
 		Description: payload.Description,
 		Status:      existingItem.Status,
-		Priority: 	 payload.Priority,
+		Priority:    payload.Priority,
 	}
 
 	if err := app.store.Tasks.UpdateByID(ctx, user.ID, item); err != nil {

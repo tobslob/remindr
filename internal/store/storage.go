@@ -12,6 +12,7 @@ import (
 var (
 	ErrNotFound          = errors.New("resource not found")
 	ErrConflict          = errors.New("resource already exist")
+	ErrInvalidCursor     = errors.New("invalid pagination cursor")
 	QueryTimeoutDuration = time.Second * 5
 )
 
@@ -26,7 +27,7 @@ type Users interface {
 type Tasks interface {
 	Create(context.Context, *Task) error
 	GetByID(context.Context, uuid.UUID, uuid.UUID) (*Task, error)
-	GetTasks(context.Context, uuid.UUID) ([]*Task, error)
+	GetTasks(context.Context, uuid.UUID, PaginationFilter) (*TasksPage, error)
 	DeleteByID(context.Context, uuid.UUID, uuid.UUID) error
 	DeleteAllByUserID(context.Context, uuid.UUID) error
 	DeleteByIDs(context.Context, []uuid.UUID, uuid.UUID) error

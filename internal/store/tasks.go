@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -34,6 +35,23 @@ type Task struct {
 	UpdatedAt   time.Time  `json:"updated_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 	DeletedAt   *time.Time `json:"deleted_at,omitempty"`
+}
+
+type PaginationFilter struct {
+	LastID *uuid.UUID
+	Limit  int
+}
+
+type PaginationMetadata struct {
+	Limit      int        `json:"limit"`
+	LastID     *uuid.UUID `json:"last_id,omitempty"`
+	NextLastID *uuid.UUID `json:"next_last_id,omitempty"`
+	HasMore    bool       `json:"has_more"`
+}
+
+type TasksPage struct {
+	Tasks      []*Task            `json:"tasks"`
+	Pagination PaginationMetadata `json:"pagination"`
 }
 
 func (s *TaskStore) Create(ctx context.Context, task *Task) error {
@@ -90,13 +108,27 @@ func (s *TaskStore) GetByID(ctx context.Context, id uuid.UUID, userID uuid.UUID)
 	return task, nil
 }
 
-func (s *TaskStore) GetTasks(ctx context.Context, userID uuid.UUID) ([]*Task, error) {
-	query := `SELECT id, user_id, title, description, status, priority, due_at, created_at, updated_at, completed_at FROM tasks WHERE user_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC`
-
+func (s *TaskStore) GetTasks(ctx context.Context, userID uuid.UUID, filter PaginationFilter) (*TasksPage, error) {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	rows, err := s.db.QueryContext(ctx, query, userID)
+	query := `SELECT id, user_id, title, description, status, priority, due_at, created_at, updated_at, completed_at FROM tasks WHERE user_id = $1 AND deleted_at IS NULL`
+	args := []any{userID}
+
+	if filter.LastID != nil {
+		cursorCreatedAt, err := s.getTaskCursorCreatedAt(ctx, userID, *filter.LastID)
+		if err != nil {
+			return nil, err
+		}
+
+		query += ` AND (created_at < $2 OR (created_at = $2 AND id < $3))`
+		args = append(args, cursorCreatedAt, *filter.LastID)
+	}
+
+	limitParamPosition := len(args) + 1
+	query += fmt.Sprintf(` ORDER BY created_at DESC, id DESC LIMIT $%d`, limitParamPosition)
+
+	rows, err := s.db.QueryContext(ctx, query, append(args, filter.Limit+1)...)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +153,43 @@ func (s *TaskStore) GetTasks(ctx context.Context, userID uuid.UUID) ([]*Task, er
 		}
 		tasks = append(tasks, task)
 	}
-	return tasks, nil
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	hasMore := len(tasks) > filter.Limit
+
+	var nextLastID *uuid.UUID
+	if hasMore {
+		nextID := tasks[filter.Limit-1].ID
+		nextLastID = &nextID
+		tasks = tasks[:filter.Limit]
+	}
+
+	return &TasksPage{
+		Tasks: tasks,
+		Pagination: PaginationMetadata{
+			Limit:      filter.Limit,
+			LastID:     filter.LastID,
+			NextLastID: nextLastID,
+			HasMore:    hasMore,
+		},
+	}, nil
+}
+
+func (s *TaskStore) getTaskCursorCreatedAt(ctx context.Context, userID uuid.UUID, lastID uuid.UUID) (time.Time, error) {
+	query := `SELECT created_at FROM tasks WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`
+
+	var createdAt time.Time
+	if err := s.db.QueryRowContext(ctx, query, lastID, userID).Scan(&createdAt); err != nil {
+		if err == sql.ErrNoRows {
+			return time.Time{}, ErrInvalidCursor
+		}
+		return time.Time{}, err
+	}
+
+	return createdAt, nil
 }
 
 func (s *TaskStore) DeleteByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
