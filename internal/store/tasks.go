@@ -37,9 +37,22 @@ type Task struct {
 	DeletedAt   *time.Time `json:"deleted_at,omitempty"`
 }
 
-type PaginationFilter struct {
+type TaskFilter struct {
 	LastID *uuid.UUID
 	Limit  int
+	Search string
+	Status *Status
+	// Priority remains a string because the column is still free-form in the
+	// schema, even though the API validates the supported values.
+	Priority *string
+	// Upper bounds are exclusive so date-only query params can map cleanly
+	// to "before next day" filters.
+	CreatedFrom     *time.Time
+	CreatedBefore   *time.Time
+	DueFrom         *time.Time
+	DueBefore       *time.Time
+	CompletedFrom   *time.Time
+	CompletedBefore *time.Time
 }
 
 type PaginationMetadata struct {
@@ -108,12 +121,31 @@ func (s *TaskStore) GetByID(ctx context.Context, id uuid.UUID, userID uuid.UUID)
 	return task, nil
 }
 
-func (s *TaskStore) GetTasks(ctx context.Context, userID uuid.UUID, filter PaginationFilter) (*TasksPage, error) {
+func (s *TaskStore) GetTasks(ctx context.Context, userID uuid.UUID, filter TaskFilter) (*TasksPage, error) {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
 	query := `SELECT id, user_id, title, description, status, priority, due_at, created_at, updated_at, completed_at FROM tasks WHERE user_id = $1 AND deleted_at IS NULL`
 	args := []any{userID}
+
+	if filter.Search != "" {
+		args = append(args, "%"+filter.Search+"%")
+		query += fmt.Sprintf(` AND ((title || ' ' || description) ILIKE $%d)`, len(args))
+	}
+
+	if filter.Status != nil {
+		args = append(args, *filter.Status)
+		query += fmt.Sprintf(` AND status = $%d`, len(args))
+	}
+
+	if filter.Priority != nil {
+		args = append(args, *filter.Priority)
+		query += fmt.Sprintf(` AND priority = $%d`, len(args))
+	}
+
+	query, args = appendTimeRangeFilter(query, args, "created_at", filter.CreatedFrom, filter.CreatedBefore)
+	query, args = appendTimeRangeFilter(query, args, "due_at", filter.DueFrom, filter.DueBefore)
+	query, args = appendTimeRangeFilter(query, args, "completed_at", filter.CompletedFrom, filter.CompletedBefore)
 
 	if filter.LastID != nil {
 		cursorCreatedAt, err := s.getTaskCursorCreatedAt(ctx, userID, *filter.LastID)
@@ -121,7 +153,14 @@ func (s *TaskStore) GetTasks(ctx context.Context, userID uuid.UUID, filter Pagin
 			return nil, err
 		}
 
-		query += ` AND (created_at < $2 OR (created_at = $2 AND id < $3))`
+		cursorCreatedAtParamPosition := len(args) + 1
+		cursorIDParamPosition := len(args) + 2
+		query += fmt.Sprintf(
+			` AND (created_at < $%d OR (created_at = $%d AND id < $%d))`,
+			cursorCreatedAtParamPosition,
+			cursorCreatedAtParamPosition,
+			cursorIDParamPosition,
+		)
 		args = append(args, cursorCreatedAt, *filter.LastID)
 	}
 
@@ -176,6 +215,20 @@ func (s *TaskStore) GetTasks(ctx context.Context, userID uuid.UUID, filter Pagin
 			HasMore:    hasMore,
 		},
 	}, nil
+}
+
+func appendTimeRangeFilter(query string, args []any, column string, from *time.Time, before *time.Time) (string, []any) {
+	if from != nil {
+		args = append(args, *from)
+		query += fmt.Sprintf(" AND %s >= $%d", column, len(args))
+	}
+
+	if before != nil {
+		args = append(args, *before)
+		query += fmt.Sprintf(" AND %s < $%d", column, len(args))
+	}
+
+	return query, args
 }
 
 func (s *TaskStore) getTaskCursorCreatedAt(ctx context.Context, userID uuid.UUID, lastID uuid.UUID) (time.Time, error) {

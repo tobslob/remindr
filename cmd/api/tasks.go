@@ -65,7 +65,7 @@ func (app *application) GetTasksHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	paginationQuery, err := utils.GetPaginationFromQuery(r)
+	taskListQuery, err := utils.GetTaskListQuery(r)
 	if err != nil {
 		utils.BadRequestError(w, r, err)
 		return
@@ -73,9 +73,18 @@ func (app *application) GetTasksHandler(w http.ResponseWriter, r *http.Request) 
 
 	ctx := r.Context()
 
-	tasks, err := app.store.Tasks.GetTasks(ctx, user.ID, store.PaginationFilter{
-		LastID: paginationQuery.LastID,
-		Limit:  paginationQuery.Limit,
+	tasks, err := app.store.Tasks.GetTasks(ctx, user.ID, store.TaskFilter{
+		LastID:          taskListQuery.LastID,
+		Limit:           taskListQuery.Limit,
+		Search:          taskListQuery.Search,
+		Status:          taskListQuery.Status,
+		Priority:        taskListQuery.Priority,
+		CreatedFrom:     taskListQuery.CreatedFrom,
+		CreatedBefore:   taskListQuery.CreatedTo,
+		DueFrom:         taskListQuery.DueFrom,
+		DueBefore:       taskListQuery.DueTo,
+		CompletedFrom:   taskListQuery.CompletedFrom,
+		CompletedBefore: taskListQuery.CompletedTo,
 	})
 	if err != nil {
 		if errors.Is(err, store.ErrInvalidCursor) {

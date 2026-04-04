@@ -27,7 +27,7 @@ type Users interface {
 type Tasks interface {
 	Create(context.Context, *Task) error
 	GetByID(context.Context, uuid.UUID, uuid.UUID) (*Task, error)
-	GetTasks(context.Context, uuid.UUID, PaginationFilter) (*TasksPage, error)
+	GetTasks(context.Context, uuid.UUID, TaskFilter) (*TasksPage, error)
 	DeleteByID(context.Context, uuid.UUID, uuid.UUID) error
 	DeleteAllByUserID(context.Context, uuid.UUID) error
 	DeleteByIDs(context.Context, []uuid.UUID, uuid.UUID) error

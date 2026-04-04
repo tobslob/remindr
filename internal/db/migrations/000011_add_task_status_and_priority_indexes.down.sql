@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS idx_tasks_active_user_priority_created_id;
+DROP INDEX IF EXISTS idx_tasks_active_user_status_created_id;
