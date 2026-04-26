@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/tobslob/todoApp/cmd/utils"
 	"github.com/tobslob/todoApp/internal/store"
@@ -12,6 +13,7 @@ type CreateTaskPayload struct {
 	Title       string  `json:"title" validate:"required"`
 	Description string  `json:"description" validate:"required"`
 	Priority    *string `json:"priority" validate:"omitempty,oneof=low medium high"`
+	DueAt	   		time.Time `json:"due_at" validate:"datetime=2006-01-02T15:04:05Z07:00,required"`
 }
 
 func (app *application) CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
@@ -44,6 +46,7 @@ func (app *application) CreateTaskHandler(w http.ResponseWriter, r *http.Request
 		Description: payload.Description,
 		Status:      store.Todo,
 		Priority:    payload.Priority,
+		DueAt:       payload.DueAt,
 	}
 
 	ctx := r.Context()

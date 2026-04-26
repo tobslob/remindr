@@ -34,14 +34,24 @@ type Tasks interface {
 	UpdateByID(context.Context, uuid.UUID, *Task) error
 }
 
+type Tags interface {
+	Create(context.Context, *Tag) error
+	GetByID(context.Context, uuid.UUID, uuid.UUID) (*Tag, error)
+	GetTags(context.Context, uuid.UUID) ([]*Tag, error)
+	DeleteByID(context.Context, uuid.UUID, uuid.UUID) error
+	UpdateByID(context.Context, uuid.UUID, *Tag) error
+}
+
 type Storage struct {
 	Users
 	Tasks
+	Tags
 }
 
 func NewStorage(db *sql.DB) *Storage {
 	return &Storage{
 		Users: &UserStore{db: db},
 		Tasks: &TaskStore{db: db},
+		Tags: &TagStore{db: db},
 	}
 }

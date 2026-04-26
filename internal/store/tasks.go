@@ -30,7 +30,7 @@ type Task struct {
 	Description string     `json:"description"`
 	Status      Status     `json:"status"`
 	Priority    *string    `json:"priority"`
-	DueAt       *time.Time `json:"due_at,omitempty"`
+	DueAt       time.Time  `json:"due_at"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
@@ -68,7 +68,7 @@ type TasksPage struct {
 }
 
 func (s *TaskStore) Create(ctx context.Context, task *Task) error {
-	query := `INSERT INTO tasks (user_id, title, description, status, priority, due_at, completed_at, deleted_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at`
+	query := `INSERT INTO tasks (user_id, title, description, status, priority, due_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
@@ -82,8 +82,6 @@ func (s *TaskStore) Create(ctx context.Context, task *Task) error {
 		task.Status,
 		task.Priority,
 		task.DueAt,
-		task.CompletedAt,
-		task.DeletedAt,
 	).Scan(
 		&task.ID,
 		&task.CreatedAt,
