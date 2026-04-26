@@ -46,6 +46,10 @@ func (app *application) CreateTagHandler(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 
 	if err := app.store.Tags.Create(ctx, item); err != nil {
+		if errors.Is(err, store.ErrConflict) {
+			utils.ConflictErr(w, r, err)
+			return
+		}
 		utils.InternalServerError(w, r, err)
 		return
 	}
@@ -124,6 +128,10 @@ func (app *application) UpdateTagHandler(w http.ResponseWriter, r *http.Request)
 	if err := app.store.Tags.UpdateByID(ctx, tagID, tag); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			utils.NotFoundError(w, r, err)
+			return
+		}
+		if errors.Is(err, store.ErrConflict) {
+			utils.ConflictErr(w, r, err)
 			return
 		}
 		utils.InternalServerError(w, r, err)

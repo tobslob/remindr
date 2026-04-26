@@ -38,7 +38,7 @@ func (s *TagStore) Create(ctx context.Context, tag *Tag) error {
 		&tag.ID,
 		&tag.CreatedAt,
 	); err != nil {
-		return err
+		return normalizeStoreError(err)
 	}
 	return nil
 }
@@ -130,7 +130,7 @@ func (s *TagStore) UpdateByID(ctx context.Context, id uuid.UUID, tag *Tag) error
 
 	result, err := s.db.ExecContext(ctx, query, tag.Name, tag.Color, id, tag.UserID)
 	if err != nil {
-		return err
+		return normalizeStoreError(err)
 	}
 
 	rowsAffected, err := result.RowsAffected()

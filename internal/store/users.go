@@ -3,11 +3,9 @@ package store
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 )
 
 type UserStore struct {
@@ -21,19 +19,6 @@ type User struct {
 	Password  string    `json:"-"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-}
-
-func normalizeUserStoreError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	var pqErr *pq.Error
-	if errors.As(err, &pqErr) && pqErr.Code == "23505" {
-		return ErrConflict
-	}
-
-	return err
 }
 
 func (s *UserStore) Create(ctx context.Context, user *User) error {
@@ -52,7 +37,7 @@ func (s *UserStore) Create(ctx context.Context, user *User) error {
 		&user.ID,
 		&user.CreatedAt,
 	); err != nil {
-		return normalizeUserStoreError(err)
+		return normalizeStoreError(err)
 	}
 
 	return nil
@@ -135,7 +120,7 @@ func (s *UserStore) UpdateByID(ctx context.Context, user *User) error {
 		user.ID,
 	)
 	if err != nil {
-		return normalizeUserStoreError(err)
+		return normalizeStoreError(err)
 	}
 
 	rowsAffected, err := res.RowsAffected()
