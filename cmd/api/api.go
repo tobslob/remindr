@@ -56,6 +56,15 @@ func (app *application) mount() http.Handler {
 			r.Delete("/", app.DeleteByUserIDHandler)
 			r.Delete("/bulk", app.DeleteByIDsHandler)
 		})
+
+		r.Route("/tags", func(r chi.Router) {
+			r.Use(app.AuthMiddleware)
+			r.Post("/", app.CreateTagHandler)
+			r.Get("/", app.GetTagsHandler)
+			r.Get("/{id}", app.GetTagHandler)
+			r.Patch("/{id}", app.UpdateTagHandler)
+			r.Delete("/{id}", app.DeleteTagHandler)
+		})
 	})
 
 	return r
