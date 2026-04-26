@@ -1,0 +1,2 @@
+ALTER TABLE tasks
+ADD CONSTRAINT fk_user_task FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;

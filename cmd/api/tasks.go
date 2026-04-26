@@ -10,10 +10,10 @@ import (
 )
 
 type CreateTaskPayload struct {
-	Title       string  `json:"title" validate:"required"`
-	Description string  `json:"description" validate:"required"`
-	Priority    *string `json:"priority" validate:"omitempty,oneof=low medium high"`
-	DueAt	   		time.Time `json:"due_at" validate:"datetime=2006-01-02T15:04:05Z07:00,required"`
+	Title       string    `json:"title" validate:"required"`
+	Description string    `json:"description" validate:"required"`
+	Priority    *string   `json:"priority" validate:"omitempty,oneof=low medium high"`
+	DueAt       time.Time `json:"due_at" validate:"datetime=2006-01-02T15:04:05Z07:00,required"`
 }
 
 func (app *application) CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
@@ -208,6 +208,7 @@ func (app *application) UpdateTaskHandler(w http.ResponseWriter, r *http.Request
 		Description: payload.Description,
 		Status:      existingItem.Status,
 		Priority:    payload.Priority,
+		DueAt:       payload.DueAt,
 	}
 
 	if err := app.store.Tasks.UpdateByID(ctx, user.ID, item); err != nil {
