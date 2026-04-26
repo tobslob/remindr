@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/tobslob/todoApp/cmd/utils"
 	"github.com/tobslob/todoApp/internal/store"
@@ -39,7 +40,7 @@ func (app *application) CreateTagHandler(w http.ResponseWriter, r *http.Request)
 
 	item := &store.Tag{
 		UserID: user.ID,
-		Name:   payload.Name,
+		Name:   strings.TrimSpace(strings.ToLower(payload.Name)),
 		Color:  payload.Color,
 	}
 
@@ -119,7 +120,7 @@ func (app *application) UpdateTagHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	if payload.Name != "" {
-		tag.Name = payload.Name
+		tag.Name = strings.TrimSpace(strings.ToLower(payload.Name))
 	}
 	if payload.Color != "" {
 		tag.Color = payload.Color
