@@ -10,10 +10,17 @@ import (
 )
 
 type CreateTaskPayload struct {
-	Title       string    `json:"title" validate:"required"`
-	Description string    `json:"description" validate:"required"`
-	Priority    *string   `json:"priority" validate:"omitempty,oneof=low medium high"`
-	DueAt       time.Time `json:"due_at" validate:"datetime=2006-01-02T15:04:05Z07:00,required"`
+	Title       string     `json:"title" validate:"required"`
+	Description string     `json:"description" validate:"required"`
+	Priority    *string    `json:"priority" validate:"omitempty,oneof=low medium high"`
+	DueAt       time.Time  `json:"due_at" validate:"required"`
+}
+
+type UpdateTaskPayload struct {
+	Title       string     `json:"title" validate:"omitempty"`
+	Description string     `json:"description" validate:"omitempty"`
+	Priority    *string    `json:"priority" validate:"omitempty,oneof=low medium high"`
+	DueAt       *time.Time `json:"due_at" validate:"omitempty"`
 }
 
 func (app *application) CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
@@ -32,6 +39,13 @@ func (app *application) CreateTaskHandler(w http.ResponseWriter, r *http.Request
 
 	if err := utils.Validate.Struct(payload); err != nil {
 		utils.BadRequestError(w, r, err)
+		return
+	}
+
+	payload.DueAt = payload.DueAt.UTC()
+
+	if payload.DueAt.Before(time.Now().UTC()) {
+		utils.BadRequestError(w, r, errors.New("due_at must be a future date"))
 		return
 	}
 
@@ -173,7 +187,7 @@ func (app *application) UpdateTaskHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var payload CreateTaskPayload
+	var payload UpdateTaskPayload
 
 	if err := utils.ReadJson(w, r, &payload); err != nil {
 		utils.BadRequestError(w, r, err)
@@ -187,7 +201,7 @@ func (app *application) UpdateTaskHandler(w http.ResponseWriter, r *http.Request
 
 	ctx := r.Context()
 
-	existingItem, err := app.store.Tasks.GetByID(ctx, taskID, user.ID)
+	existingTask, err := app.store.Tasks.GetByID(ctx, taskID, user.ID)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			utils.NotFoundError(w, r, err)
@@ -198,7 +212,17 @@ func (app *application) UpdateTaskHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	if payload.Priority == nil {
-		payload.Priority = existingItem.Priority
+		payload.Priority = existingTask.Priority
+	}
+
+	if payload.Title == "" {
+		payload.Title = existingTask.Title
+	}
+	if payload.Description == "" {
+		payload.Description = existingTask.Description
+	}
+	if payload.DueAt == nil {
+		payload.DueAt = &existingTask.DueAt
 	}
 
 	item := &store.Task{
@@ -206,9 +230,9 @@ func (app *application) UpdateTaskHandler(w http.ResponseWriter, r *http.Request
 		UserID:      user.ID,
 		Title:       payload.Title,
 		Description: payload.Description,
-		Status:      existingItem.Status,
+		Status:      existingTask.Status,
 		Priority:    payload.Priority,
-		DueAt:       payload.DueAt,
+		DueAt:       *payload.DueAt,
 	}
 
 	if err := app.store.Tasks.UpdateByID(ctx, user.ID, item); err != nil {
