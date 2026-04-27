@@ -49,6 +49,8 @@ func (app *application) mount() http.Handler {
 		r.Route("/tasks", func(r chi.Router) {
 			r.Use(app.AuthMiddleware)
 			r.Post("/", app.CreateTaskHandler)
+			r.Post("/{id}/tags/{tag_id}", app.AttachTagToTaskHandler)
+			r.Get("/tags", app.GetTagsByTaskIDsHandler)
 			r.Get("/{id}", app.GetTaskByIDHandler)
 			r.Get("/", app.GetTasksHandler)
 			r.Patch("/{id}", app.UpdateTaskHandler)
@@ -62,8 +64,10 @@ func (app *application) mount() http.Handler {
 			r.Post("/", app.CreateTagHandler)
 			r.Get("/", app.GetTagsHandler)
 			r.Get("/{id}", app.GetTagHandler)
+			r.Get("/{id}/tasks", app.GetTasksByTagIDHandler)
 			r.Patch("/{id}", app.UpdateTagHandler)
 			r.Delete("/{id}", app.DeleteTagHandler)
+			r.Delete("/{task_id}/{id}", app.DetachTagFromTaskHandler)
 		})
 	})
 

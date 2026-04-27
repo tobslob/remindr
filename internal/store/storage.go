@@ -42,10 +42,18 @@ type Tags interface {
 	UpdateByID(context.Context, uuid.UUID, *Tag) error
 }
 
+type TaskTags interface {
+	AttachTagToTask(context.Context, *TaskTag) error
+	GetTagsByTaskIDs(context.Context, []uuid.UUID, uuid.UUID) (map[uuid.UUID][]*Tag, error)
+	GetTasksByTagID(context.Context, uuid.UUID, uuid.UUID) ([]*Task, error)
+	DetachTagFromTask(context.Context, uuid.UUID, uuid.UUID) error
+}
+
 type Storage struct {
 	Users
 	Tasks
 	Tags
+	TaskTags
 }
 
 func NewStorage(db *sql.DB) *Storage {
@@ -53,5 +61,6 @@ func NewStorage(db *sql.DB) *Storage {
 		Users: &UserStore{db: db},
 		Tasks: &TaskStore{db: db},
 		Tags: &TagStore{db: db},
+		TaskTags: &TaskTagStore{db: db},
 	}
 }

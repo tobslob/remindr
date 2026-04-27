@@ -8,8 +8,13 @@ import (
 	"github.com/google/uuid"
 )
 
-func GetIDParam(r *http.Request) (uuid.UUID, error) {
-	id := r.PathValue("id")
+func GetIDParam(r *http.Request, paramName ...string) (uuid.UUID, error) {
+	name := "id"
+	if len(paramName) > 0 && paramName[0] != "" {
+		name = paramName[0]
+	}
+
+	id := r.PathValue(name)
 	return uuid.Parse(id)
 }
 
