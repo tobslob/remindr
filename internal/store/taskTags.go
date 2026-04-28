@@ -19,24 +19,90 @@ type TaskTag struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-func (s *TaskTagStore) AttachTagToTask(ctx context.Context, taskTag *TaskTag) error {
+func deduplicateUUIDs(ids []uuid.UUID) []uuid.UUID {
+	if len(ids) == 0 {
+		return ids
+	}
+
+	deduplicated := make([]uuid.UUID, 0, len(ids))
+	seen := make(map[uuid.UUID]struct{}, len(ids))
+	for _, id := range ids {
+		if _, exists := seen[id]; exists {
+			continue
+		}
+
+		seen[id] = struct{}{}
+		deduplicated = append(deduplicated, id)
+	}
+
+	return deduplicated
+}
+
+func (s *TaskTagStore) lockTaskForTagMutation(ctx context.Context, tx *sql.Tx, taskID uuid.UUID, userID uuid.UUID) error {
+	var lockedTaskID uuid.UUID
+	if err := tx.QueryRowContext(
+		ctx,
+		`SELECT id FROM tasks WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL FOR UPDATE`,
+		taskID,
+		userID,
+	).Scan(&lockedTaskID); err != nil {
+		return normalizeStoreError(err)
+	}
+
+	return nil
+}
+
+func (s *TaskTagStore) ensureActiveTag(ctx context.Context, tx *sql.Tx, tagID uuid.UUID, userID uuid.UUID) error {
+	var lockedTagID uuid.UUID
+	if err := tx.QueryRowContext(
+		ctx,
+		`SELECT id FROM tags WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL FOR UPDATE`,
+		tagID,
+		userID,
+	).Scan(&lockedTagID); err != nil {
+		return normalizeStoreError(err)
+	}
+
+	return nil
+}
+
+func (s *TaskTagStore) AttachTagToTask(ctx context.Context, userID uuid.UUID, taskTag *TaskTag) error {
 	query := `INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2) RETURNING task_id, tag_id, created_at`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	if err := s.db.QueryRowContext(
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return normalizeStoreError(err)
+	}
+	defer tx.Rollback()
+
+	if err := s.lockTaskForTagMutation(ctx, tx, taskTag.TaskID, userID); err != nil {
+		return err
+	}
+
+	if err := s.ensureActiveTag(ctx, tx, taskTag.TagID, userID); err != nil {
+		return err
+	}
+
+	if err := tx.QueryRowContext(
 		ctx,
 		query,
 		taskTag.TaskID,
 		taskTag.TagID,
 	).Scan(
 		&taskTag.TaskID,
-		&taskTag.TagID,
-		&taskTag.CreatedAt,
-	); err != nil {
+			&taskTag.TagID,
+			&taskTag.CreatedAt,
+		); err != nil {
 		return normalizeStoreError(err)
 	}
+
+	if err := tx.Commit(); err != nil {
+		return normalizeStoreError(err)
+	}
+
 	return nil
 }
 
@@ -97,19 +163,9 @@ func (s *TaskTagStore) GetTagsByTaskIDs(ctx context.Context, taskIDs []uuid.UUID
 	return tagsByTaskID, nil
 }
 
-func (s *TaskTagStore) DetachTagFromTask(ctx context.Context, taskID uuid.UUID, tagID uuid.UUID) error {
+func (s *TaskTagStore) DetachTagFromTask(ctx context.Context, taskID uuid.UUID, tagID uuid.UUID, userID uuid.UUID) error {
 	query := `DELETE FROM task_tags WHERE task_id = $1 AND tag_id = $2`
 
-	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
-	defer cancel()
-
-	if _, err := s.db.ExecContext(ctx, query, taskID, tagID); err != nil {
-		return normalizeStoreError(err)
-	}
-	return nil
-}
-
-func (s *TaskTagStore) ReplaceTaskTags(ctx context.Context, taskID uuid.UUID, userID uuid.UUID, tagIDs []uuid.UUID) error {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
@@ -119,23 +175,50 @@ func (s *TaskTagStore) ReplaceTaskTags(ctx context.Context, taskID uuid.UUID, us
 	}
 	defer tx.Rollback()
 
-	var lockedTaskID uuid.UUID
-	if err := tx.QueryRowContext(
-		ctx,
-		`SELECT id FROM tasks WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL FOR UPDATE`,
-		taskID,
-		userID,
-	).Scan(&lockedTaskID); err != nil {
-		if err == sql.ErrNoRows {
-			return ErrNotFound
-		}
+	if err := s.lockTaskForTagMutation(ctx, tx, taskID, userID); err != nil {
+		return err
+	}
+
+	res, err := tx.ExecContext(ctx, query, taskID, tagID)
+	if err != nil {
 		return normalizeStoreError(err)
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return normalizeStoreError(err)
+	}
+	if rowsAffected == 0 {
+		return ErrNotFound
+	}
+
+	if err := tx.Commit(); err != nil {
+		return normalizeStoreError(err)
+	}
+
+	return nil
+}
+
+func (s *TaskTagStore) ReplaceTaskTags(ctx context.Context, taskID uuid.UUID, userID uuid.UUID, tagIDs []uuid.UUID) error {
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
+	defer cancel()
+
+	tagIDs = deduplicateUUIDs(tagIDs)
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return normalizeStoreError(err)
+	}
+	defer tx.Rollback()
+
+	if err := s.lockTaskForTagMutation(ctx, tx, taskID, userID); err != nil {
+		return err
 	}
 
 	if len(tagIDs) > 0 {
 		rows, err := tx.QueryContext(
 			ctx,
-			`SELECT id FROM tags WHERE id = ANY($1) AND user_id = $2 AND deleted_at IS NULL`,
+			`SELECT id FROM tags WHERE id = ANY($1) AND user_id = $2 AND deleted_at IS NULL FOR UPDATE`,
 			pq.Array(tagIDs),
 			userID,
 		)
@@ -212,7 +295,8 @@ func (s *TaskTagStore) GetTasksByTagID(ctx context.Context, tagID uuid.UUID, use
 		AND tk.user_id = $2
 		AND t.user_id = $2
 		AND tk.deleted_at IS NULL
-		AND t.deleted_at IS NULL;
+		AND t.deleted_at IS NULL
+	ORDER BY tk.created_at DESC, tk.id DESC;
 	`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)

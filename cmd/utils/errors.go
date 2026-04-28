@@ -15,7 +15,7 @@ func init() {
 
 func InternalServerError(w http.ResponseWriter, r *http.Request, err error) {
 	log.Printf("internal server error: %s path: %s\n error: %s", r.Method, r.URL.Path, err)
-	ErrorJson(w, http.StatusInternalServerError, err.Error())
+	ErrorJson(w, http.StatusInternalServerError, "the server encountered a problem and could not process your request")
 }
 
 func ConflictErr(w http.ResponseWriter, r *http.Request, err error) {

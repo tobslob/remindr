@@ -43,10 +43,10 @@ type Tags interface {
 }
 
 type TaskTags interface {
-	AttachTagToTask(context.Context, *TaskTag) error
+	AttachTagToTask(context.Context, uuid.UUID, *TaskTag) error
 	GetTagsByTaskIDs(context.Context, []uuid.UUID, uuid.UUID) (map[uuid.UUID][]*Tag, error)
 	GetTasksByTagID(context.Context, uuid.UUID, uuid.UUID) ([]*Task, error)
-	DetachTagFromTask(context.Context, uuid.UUID, uuid.UUID) error
+	DetachTagFromTask(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) error
 	ReplaceTaskTags(context.Context, uuid.UUID, uuid.UUID, []uuid.UUID) error
 }
 

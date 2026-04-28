@@ -25,7 +25,12 @@ func ReadJson(w http.ResponseWriter, r *http.Request, data any) error {
 			return errors.New("body must not be empty")
 		}
 		return err
-		}
+	}
+
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		return errors.New("body must only contain a single JSON value")
+	}
+
 	return nil
 }
 

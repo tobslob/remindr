@@ -69,7 +69,7 @@ func (app *application) AttachTagToTaskHandler(w http.ResponseWriter, r *http.Re
 		TagID:  tagID,
 	}
 
-	if err := app.store.TaskTags.AttachTagToTask(ctx, taskTag); err != nil {
+	if err := app.store.TaskTags.AttachTagToTask(ctx, user.ID, taskTag); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			utils.NotFoundError(w, r, err)
 			return
@@ -250,7 +250,7 @@ func (app *application) DetachTagFromTaskHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if err := app.store.TaskTags.DetachTagFromTask(ctx, taskID, tagID); err != nil {
+	if err := app.store.TaskTags.DetachTagFromTask(ctx, taskID, tagID, user.ID); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			utils.NotFoundError(w, r, err)
 			return

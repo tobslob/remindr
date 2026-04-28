@@ -97,6 +97,10 @@ func (s *TagStore) GetTags(ctx context.Context, userID uuid.UUID) ([]*Tag, error
 		tags = append(tags, tag)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return tags, nil
 }
 

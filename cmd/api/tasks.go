@@ -196,6 +196,15 @@ func (app *application) UpdateTaskHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if payload.DueAt != nil {
+		dueAt := payload.DueAt.UTC()
+		if dueAt.Before(time.Now().UTC()) {
+			utils.BadRequestError(w, r, errors.New("due_at must be a future date"))
+			return
+		}
+		payload.DueAt = &dueAt
+	}
+
 	existingTask, err := app.store.Tasks.GetByID(ctx, taskID, user.ID)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -227,7 +236,7 @@ func (app *application) UpdateTaskHandler(w http.ResponseWriter, r *http.Request
 		Description: payload.Description,
 		Status:      existingTask.Status,
 		Priority:    payload.Priority,
-		DueAt:       *payload.DueAt,
+		DueAt:       payload.DueAt.UTC(),
 	}
 
 	if err := app.store.Tasks.UpdateByID(ctx, user.ID, item); err != nil {
