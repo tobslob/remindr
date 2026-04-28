@@ -14,14 +14,13 @@ type TaskTagStore struct {
 }
 
 type TaskTag struct {
-	ID        uuid.UUID `json:"id"`
 	TaskID    uuid.UUID `json:"task_id"`
 	TagID     uuid.UUID `json:"tag_id"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
 func (s *TaskTagStore) AttachTagToTask(ctx context.Context, taskTag *TaskTag) error {
-	query := `INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2) RETURNING id, created_at`
+	query := `INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2) RETURNING task_id, tag_id, created_at`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
@@ -32,7 +31,8 @@ func (s *TaskTagStore) AttachTagToTask(ctx context.Context, taskTag *TaskTag) er
 		taskTag.TaskID,
 		taskTag.TagID,
 	).Scan(
-		&taskTag.ID,
+		&taskTag.TaskID,
+		&taskTag.TagID,
 		&taskTag.CreatedAt,
 	); err != nil {
 		return normalizeStoreError(err)
@@ -51,6 +51,7 @@ func (s *TaskTagStore) GetTagsByTaskIDs(ctx context.Context, taskIDs []uuid.UUID
 	query := `
 	SELECT
 		tt.task_id,
+		t.user_id,
 		t.id,
 		t.name,
 		t.color,
@@ -79,6 +80,7 @@ func (s *TaskTagStore) GetTagsByTaskIDs(ctx context.Context, taskIDs []uuid.UUID
 		tag := &Tag{}
 		if err := rows.Scan(
 			&taskID,
+			&tag.UserID,
 			&tag.ID,
 			&tag.Name,
 			&tag.Color,

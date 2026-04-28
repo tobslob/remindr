@@ -24,7 +24,8 @@ type UpdateTaskPayload struct {
 }
 
 func (app *application) CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetUserFromContext(r.Context())
+	ctx := r.Context()
+	user := utils.GetUserFromContext(ctx)
 	if user == nil {
 		utils.UnauthorizedError(w, r, errors.New("user not found in request context"))
 		return
@@ -63,8 +64,6 @@ func (app *application) CreateTaskHandler(w http.ResponseWriter, r *http.Request
 		DueAt:       payload.DueAt,
 	}
 
-	ctx := r.Context()
-
 	if err := app.store.Tasks.Create(ctx, item); err != nil {
 		utils.InternalServerError(w, r, err)
 		return
@@ -76,7 +75,8 @@ func (app *application) CreateTaskHandler(w http.ResponseWriter, r *http.Request
 }
 
 func (app *application) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetUserFromContext(r.Context())
+	ctx := r.Context()
+	user := utils.GetUserFromContext(ctx)
 	if user == nil {
 		utils.UnauthorizedError(w, r, errors.New("user not found in request context"))
 		return
@@ -87,8 +87,6 @@ func (app *application) GetTasksHandler(w http.ResponseWriter, r *http.Request) 
 		utils.BadRequestError(w, r, err)
 		return
 	}
-
-	ctx := r.Context()
 
 	tasks, err := app.store.Tasks.GetTasks(ctx, user.ID, store.TaskFilter{
 		LastID:          taskListQuery.LastID,
@@ -118,7 +116,8 @@ func (app *application) GetTasksHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 func (app *application) GetTaskByIDHandler(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetUserFromContext(r.Context())
+	ctx := r.Context()
+	user := utils.GetUserFromContext(ctx)
 	if user == nil {
 		utils.UnauthorizedError(w, r, errors.New("user not found in request context"))
 		return
@@ -129,8 +128,6 @@ func (app *application) GetTaskByIDHandler(w http.ResponseWriter, r *http.Reques
 		utils.BadRequestError(w, r, err)
 		return
 	}
-
-	ctx := r.Context()
 
 	item, err := app.store.Tasks.GetByID(ctx, itemID, user.ID)
 	if err != nil {
@@ -148,7 +145,8 @@ func (app *application) GetTaskByIDHandler(w http.ResponseWriter, r *http.Reques
 }
 
 func (app *application) DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetUserFromContext(r.Context())
+	ctx := r.Context()
+	user := utils.GetUserFromContext(ctx)
 	if user == nil {
 		utils.UnauthorizedError(w, r, errors.New("user not found in request context"))
 		return
@@ -159,8 +157,6 @@ func (app *application) DeleteTaskHandler(w http.ResponseWriter, r *http.Request
 		utils.BadRequestError(w, r, err)
 		return
 	}
-
-	ctx := r.Context()
 
 	if err := app.store.Tasks.DeleteByID(ctx, itemID, user.ID); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -175,7 +171,8 @@ func (app *application) DeleteTaskHandler(w http.ResponseWriter, r *http.Request
 }
 
 func (app *application) UpdateTaskHandler(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetUserFromContext(r.Context())
+	ctx := r.Context()
+	user := utils.GetUserFromContext(ctx)
 	if user == nil {
 		utils.UnauthorizedError(w, r, errors.New("user not found in request context"))
 		return
@@ -198,8 +195,6 @@ func (app *application) UpdateTaskHandler(w http.ResponseWriter, r *http.Request
 		utils.BadRequestError(w, r, err)
 		return
 	}
-
-	ctx := r.Context()
 
 	existingTask, err := app.store.Tasks.GetByID(ctx, taskID, user.ID)
 	if err != nil {
@@ -256,13 +251,12 @@ func (app *application) UpdateTaskHandler(w http.ResponseWriter, r *http.Request
 }
 
 func (app *application) DeleteByUserIDHandler(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetUserFromContext(r.Context())
+	ctx := r.Context()
+	user := utils.GetUserFromContext(ctx)
 	if user == nil {
 		utils.UnauthorizedError(w, r, errors.New("user not found in request context"))
 		return
 	}
-
-	ctx := r.Context()
 
 	if err := app.store.Tasks.DeleteAllByUserID(ctx, user.ID); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -277,7 +271,8 @@ func (app *application) DeleteByUserIDHandler(w http.ResponseWriter, r *http.Req
 }
 
 func (app *application) DeleteByIDsHandler(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetUserFromContext(r.Context())
+	ctx := r.Context()
+	user := utils.GetUserFromContext(ctx)
 	if user == nil {
 		utils.UnauthorizedError(w, r, errors.New("user not found in request context"))
 		return
@@ -288,8 +283,6 @@ func (app *application) DeleteByIDsHandler(w http.ResponseWriter, r *http.Reques
 		utils.BadRequestError(w, r, err)
 		return
 	}
-
-	ctx := r.Context()
 
 	if err := app.store.Tasks.DeleteByIDs(ctx, ids, user.ID); err != nil {
 		if errors.Is(err, store.ErrNotFound) {

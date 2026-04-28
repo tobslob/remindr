@@ -123,7 +123,7 @@ func (app *application) UpdateTagHandler(w http.ResponseWriter, r *http.Request)
 		tag.Name = strings.TrimSpace(strings.ToLower(payload.Name))
 	}
 	if payload.Color != "" {
-		tag.Color = payload.Color
+		tag.Color = strings.TrimSpace(payload.Color)
 	}
 
 	if err := app.store.Tags.UpdateByID(ctx, tagID, tag); err != nil {
