@@ -20,7 +20,8 @@ type UpdateTagPayload struct {
 }
 
 func (app *application) CreateTagHandler(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetUserFromContext(r.Context())
+	ctx := r.Context()
+	user := utils.GetUserFromContext(ctx)
 	if user == nil {
 		utils.UnauthorizedError(w, r, errors.New("user not found in request context"))
 		return
@@ -44,8 +45,6 @@ func (app *application) CreateTagHandler(w http.ResponseWriter, r *http.Request)
 		Color:  payload.Color,
 	}
 
-	ctx := r.Context()
-
 	if err := app.store.Tags.Create(ctx, item); err != nil {
 		if errors.Is(err, store.ErrConflict) {
 			utils.ConflictErr(w, r, err)
@@ -62,13 +61,12 @@ func (app *application) CreateTagHandler(w http.ResponseWriter, r *http.Request)
 }
 
 func (app *application) GetTagsHandler(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetUserFromContext(r.Context())
+	ctx := r.Context()
+	user := utils.GetUserFromContext(ctx)
 	if user == nil {
 		utils.UnauthorizedError(w, r, errors.New("user not found in request context"))
 		return
 	}
-
-	ctx := r.Context()
 
 	tags, err := app.store.Tags.GetTags(ctx, user.ID)
 	if err != nil {
@@ -83,7 +81,8 @@ func (app *application) GetTagsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) UpdateTagHandler(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetUserFromContext(r.Context())
+	ctx := r.Context()
+	user := utils.GetUserFromContext(ctx)
 	if user == nil {
 		utils.UnauthorizedError(w, r, errors.New("user not found in request context"))
 		return
@@ -106,8 +105,6 @@ func (app *application) UpdateTagHandler(w http.ResponseWriter, r *http.Request)
 		utils.BadRequestError(w, r, err)
 		return
 	}
-
-	ctx := r.Context()
 
 	tag, err := app.store.Tags.GetByID(ctx, tagID, user.ID)
 	if err != nil {
@@ -146,7 +143,8 @@ func (app *application) UpdateTagHandler(w http.ResponseWriter, r *http.Request)
 }
 
 func (app *application) GetTagHandler(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetUserFromContext(r.Context())
+	ctx := r.Context()
+	user := utils.GetUserFromContext(ctx)
 	if user == nil {
 		utils.UnauthorizedError(w, r, errors.New("user not found in request context"))
 		return
@@ -157,8 +155,6 @@ func (app *application) GetTagHandler(w http.ResponseWriter, r *http.Request) {
 		utils.BadRequestError(w, r, err)
 		return
 	}
-
-	ctx := r.Context()
 
 	tag, err := app.store.Tags.GetByID(ctx, tagID, user.ID)
 	if err != nil {
@@ -177,7 +173,8 @@ func (app *application) GetTagHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) DeleteTagHandler(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetUserFromContext(r.Context())
+	ctx := r.Context()
+	user := utils.GetUserFromContext(ctx)
 	if user == nil {
 		utils.UnauthorizedError(w, r, errors.New("user not found in request context"))
 		return
@@ -188,8 +185,6 @@ func (app *application) DeleteTagHandler(w http.ResponseWriter, r *http.Request)
 		utils.BadRequestError(w, r, err)
 		return
 	}
-
-	ctx := r.Context()
 
 	if err := app.store.Tags.DeleteByID(ctx, tagID, user.ID); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
