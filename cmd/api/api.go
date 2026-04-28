@@ -12,14 +12,14 @@ import (
 )
 
 type application struct {
-	config config
-	store  *store.Storage
+	config     config
+	store      *store.Storage
 	tokenMaker tokens.Maker
 }
 
-type config struct{
-	addr 					 string
-	db 						 string
+type config struct {
+	addr           string
+	db             string
 	dbMaxOpenConns int
 	dbMaxIdleConns int
 	dbMaxIdleTime  string
@@ -50,6 +50,7 @@ func (app *application) mount() http.Handler {
 			r.Use(app.AuthMiddleware)
 			r.Post("/", app.CreateTaskHandler)
 			r.Post("/{id}/tags/{tag_id}", app.AttachTagToTaskHandler)
+			r.Put("/{id}/tags", app.ReplaceTaskTagsHandler)
 			r.Get("/tags", app.GetTagsByTaskIDsHandler)
 			r.Get("/{id}", app.GetTaskByIDHandler)
 			r.Get("/", app.GetTasksHandler)

@@ -47,6 +47,7 @@ type TaskTags interface {
 	GetTagsByTaskIDs(context.Context, []uuid.UUID, uuid.UUID) (map[uuid.UUID][]*Tag, error)
 	GetTasksByTagID(context.Context, uuid.UUID, uuid.UUID) ([]*Task, error)
 	DetachTagFromTask(context.Context, uuid.UUID, uuid.UUID) error
+	ReplaceTaskTags(context.Context, uuid.UUID, uuid.UUID, []uuid.UUID) error
 }
 
 type Storage struct {
@@ -58,9 +59,9 @@ type Storage struct {
 
 func NewStorage(db *sql.DB) *Storage {
 	return &Storage{
-		Users: &UserStore{db: db},
-		Tasks: &TaskStore{db: db},
-		Tags: &TagStore{db: db},
+		Users:    &UserStore{db: db},
+		Tasks:    &TaskStore{db: db},
+		Tags:     &TagStore{db: db},
 		TaskTags: &TaskTagStore{db: db},
 	}
 }

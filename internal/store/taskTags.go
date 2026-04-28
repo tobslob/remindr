@@ -109,6 +109,89 @@ func (s *TaskTagStore) DetachTagFromTask(ctx context.Context, taskID uuid.UUID, 
 	return nil
 }
 
+func (s *TaskTagStore) ReplaceTaskTags(ctx context.Context, taskID uuid.UUID, userID uuid.UUID, tagIDs []uuid.UUID) error {
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
+	defer cancel()
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return normalizeStoreError(err)
+	}
+	defer tx.Rollback()
+
+	var lockedTaskID uuid.UUID
+	if err := tx.QueryRowContext(
+		ctx,
+		`SELECT id FROM tasks WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL FOR UPDATE`,
+		taskID,
+		userID,
+	).Scan(&lockedTaskID); err != nil {
+		if err == sql.ErrNoRows {
+			return ErrNotFound
+		}
+		return normalizeStoreError(err)
+	}
+
+	if len(tagIDs) > 0 {
+		rows, err := tx.QueryContext(
+			ctx,
+			`SELECT id FROM tags WHERE id = ANY($1) AND user_id = $2 AND deleted_at IS NULL`,
+			pq.Array(tagIDs),
+			userID,
+		)
+		if err != nil {
+			return normalizeStoreError(err)
+		}
+
+		validTagCount := 0
+		for rows.Next() {
+			validTagCount++
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return normalizeStoreError(err)
+		}
+		if err := rows.Close(); err != nil {
+			return normalizeStoreError(err)
+		}
+
+		if validTagCount != len(tagIDs) {
+			return ErrNotFound
+		}
+
+		if _, err := tx.ExecContext(
+			ctx,
+			`DELETE FROM task_tags WHERE task_id = $1 AND NOT (tag_id = ANY($2))`,
+			taskID,
+			pq.Array(tagIDs),
+		); err != nil {
+			return normalizeStoreError(err)
+		}
+
+		if _, err := tx.ExecContext(
+			ctx,
+			`INSERT INTO task_tags (task_id, tag_id)
+			 SELECT $1, u.tag_id
+			 FROM unnest($2::uuid[]) AS u(tag_id)
+			 ON CONFLICT (task_id, tag_id) DO NOTHING`,
+			taskID,
+			pq.Array(tagIDs),
+		); err != nil {
+			return normalizeStoreError(err)
+		}
+	} else {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM task_tags WHERE task_id = $1`, taskID); err != nil {
+			return normalizeStoreError(err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return normalizeStoreError(err)
+	}
+
+	return nil
+}
+
 func (s *TaskTagStore) GetTasksByTagID(ctx context.Context, tagID uuid.UUID, userID uuid.UUID) ([]*Task, error) {
 	query := `
 	SELECT
