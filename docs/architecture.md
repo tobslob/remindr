@@ -8,7 +8,7 @@ Remindr is organized as a layered HTTP application:
 2. `cmd/tokens` handles JWT signing and verification
 3. `internal/store` performs database reads and writes
 4. `internal/db` manages connection setup and schema migrations
-5. `internal/reminder` holds reminder domain types and future runtime components
+5. `internal/reminder` holds reminder domain types and runtime components
 
 ## Design Methodology
 
@@ -118,15 +118,25 @@ What exists today:
 - mark reminder back to `pending` or `failed`
 - fetch one `processing` reminder for sending
 
+Runtime behavior:
+
+- the service starts in [`cmd/api/main.go`](../cmd/api/main.go) alongside the HTTP server
+- the scheduler claims due reminders immediately on startup, then every 30 seconds by default
+- each claim moves eligible reminders to `processing`, increments `attempts`, and enqueues jobs
+- worker orchestration consumes claimed reminder jobs from an in-memory queue
+- workers call `reminder.Sender`, then mark reminders `sent` or failed
+- failed reminders return to `pending` until the third attempt, when the store marks them `failed`
+- stale `processing` reminders older than 10 minutes can be claimed again
+- default transport sender logs due reminders
+- custom transports can implement `reminder.Sender`
+
 What does not exist yet:
 
-- scheduler loop
-- worker orchestration
-- transport sender implementation
 - automatic reminder creation from task flows
 
-Those future runtime components have placeholder files in:
+The runtime components live in:
 
+- [`internal/reminder/model.go`](../internal/reminder/model.go)
 - [`internal/reminder/scheduler.go`](../internal/reminder/scheduler.go)
 - [`internal/reminder/service.go`](../internal/reminder/service.go)
 - [`internal/reminder/worker.go`](../internal/reminder/worker.go)
@@ -150,7 +160,17 @@ Examples:
 - DB connection pool setup
 - JWT maker creation
 - store construction
+- reminder service construction and startup
 - HTTP server startup
+
+Reminder service defaults:
+
+- interval: `30s`
+- batch size: `25`
+- workers: `2`
+- queue size: same as batch size
+
+The service currently uses `reminder.NewLogSender(log.Default())`, so delivery is observable in logs but not sent to an external provider.
 
 Development container support:
 

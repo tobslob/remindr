@@ -13,24 +13,7 @@ type ReminderStore struct {
 	db *sql.DB
 }
 
-type Reminder struct {
-	ID     uuid.UUID `json:"id"`
-	TaskID uuid.UUID `json:"task_id"`
-	UserID uuid.UUID `json:"user_id"`
-
-	Type   reminder.ReminderType   `json:"type"`
-	Status reminder.ReminderStatus `json:"status"`
-
-	RemindAt time.Time `json:"remind_at"`
-
-	Attempts         int     `json:"attempts"`
-	LastAttemptError *string `json:"last_attempt_error"`
-
-	SentAt *time.Time `json:"sent_at"`
-
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
+type Reminder = reminder.Record
 
 func (s *ReminderStore) Create(ctx context.Context, r *Reminder) error {
 	query :=
@@ -230,7 +213,10 @@ func (s *ReminderStore) ClaimDue(ctx context.Context, limit int64) ([]*Reminder,
 	    FROM reminders r
 	    JOIN tasks t ON t.id = r.task_id AND t.user_id = r.user_id
 	    WHERE r.remind_at <= now()
-	      AND r.status = 'pending'
+	      AND (
+	        r.status = 'pending'
+	        OR (r.status = 'processing' AND r.updated_at < now() - interval '10 minutes')
+	      )
 	      AND t.deleted_at IS NULL
 	    ORDER BY r.remind_at ASC
 	    LIMIT $1

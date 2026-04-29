@@ -83,6 +83,7 @@ Request body:
 Notes:
 
 - `priority` defaults to `medium` if omitted
+- valid priorities are `low`, `medium`, and `high`
 - `due_at` must be in the future
 - task `status` is created as `todo`
 
@@ -104,11 +105,39 @@ Supported query params:
 - `completed_from`
 - `completed_to`
 
+Aliases:
+
+- `q` may be used instead of `search`
+- `lastId` may be used instead of `last_id`
+- date filters also accept `created_at_from`, `created_at_to`, `due_at_from`, `due_at_to`, `completed_at_from`, and `completed_at_to`
+- camelCase aliases are accepted for those date filters
+
+Filter notes:
+
+- `status` accepts `todo`, `in_progress`, or `done`; hyphenated `in-progress` is normalized
+- `priority` accepts `low`, `medium`, or `high`
+- time filters accept RFC3339 timestamps or `YYYY-MM-DD` dates
+- date-only upper bounds are treated as exclusive before the next day, so `due_to=2026-05-31` includes all tasks due on May 31
+- `limit` defaults to `20` and may not exceed `100`
+
 Examples:
 
 ```http
 GET /v1/tasks/?limit=20&status=todo&priority=high
 GET /v1/tasks/?q=rent&due_from=2026-05-01&due_to=2026-05-31
+```
+
+Response shape:
+
+```json
+{
+  "tasks": [],
+  "pagination": {
+    "limit": 20,
+    "next_last_id": "11111111-1111-1111-1111-111111111111",
+    "has_more": true
+  }
+}
 ```
 
 ### `GET /tasks/{id}`
@@ -133,7 +162,9 @@ Request body fields are optional:
 Notes:
 
 - omitted fields keep their current values
+- valid priorities are `low`, `medium`, and `high`
 - if provided, `due_at` must still be in the future
+- task `status` is not currently updated by this endpoint
 
 ### `DELETE /tasks/{id}`
 
@@ -146,6 +177,10 @@ Implementation note:
 ### `DELETE /tasks/`
 
 Soft-deletes all tasks for the authenticated user.
+
+Implementation note:
+
+- associated reminder rows are deleted in the same transaction
 
 ### `DELETE /tasks/bulk`
 
@@ -275,6 +310,7 @@ Notes:
 - the authenticated user is used as the reminder owner; the client does not supply `user_id`
 - new reminders begin in the `pending` lifecycle state
 - duplicate logical reminders are rejected if `(task_id, user_id, type, remind_at)` already exists
+- due reminders are later processed by the background reminder service; the API create path does not send immediately
 
 ### `GET /reminders/task/{task_id}`
 
@@ -301,10 +337,30 @@ Notes:
 
 - if provided, `type` must be one of `before_due` or `due_now`
 - if provided, `remind_at` must be in the future
+- updating `type` or `remind_at` can conflict with another reminder for the same task, user, type, and reminder time
 
 ### `DELETE /reminders/{id}`
 
 Deletes a reminder owned by the authenticated user.
+
+## Reminder Lifecycle
+
+Reminder status values:
+
+- `pending`: waiting for its `remind_at` time
+- `processing`: claimed by the scheduler and ready for a worker
+- `sent`: sender completed successfully
+- `failed`: sender failed after the retry limit
+- `cancelled`: supported by the store layer, but not exposed as a public API route
+
+Runtime behavior:
+
+- the scheduler claims due `pending` reminders in batches
+- stale `processing` reminders older than 10 minutes can be reclaimed
+- each claim increments `attempts`
+- successful sends set `sent_at`
+- failed sends store `last_attempt_error`
+- after three attempts, failed reminders stay `failed`
 
 ## Error Behavior
 

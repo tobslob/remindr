@@ -127,8 +127,10 @@ Reminder status values in code:
 Important rules:
 
 - reminder belongs to a task and a user
+- original foreign keys reference `tasks(id)` and `users(id)`, and later migrations add ownership-safe composite constraints
 - composite foreign key `(task_id, user_id) -> tasks(id, user_id)`
 - duplicate logical reminders are blocked by unique constraint on `(task_id, user_id, type, remind_at)`
+- query indexes exist on `(status, remind_at)`, `task_id`, and `user_id`
 
 ## Ownership Strategy
 
@@ -153,10 +155,23 @@ Hard-deleted:
 
 ## Reminder Runtime Status
 
-The schema and store support reminders, but the runtime processing loop is not implemented yet.
+The schema, store, and runtime processing loop support reminders.
 
 That means:
 
 - reminder rows can be created, updated, deleted, and constrained correctly
-- claim/send lifecycle methods exist in the store
-- scheduler/worker/sender runtime components are still placeholders
+- due reminders are claimed in batches and transitioned from `pending` to `processing`
+- each claim increments `attempts`
+- stale `processing` reminders older than 10 minutes are eligible to be reclaimed
+- workers send claimed reminders through the configured sender
+- successful sends are marked `sent`
+- failed sends store `last_attempt_error`
+- failed sends are returned to `pending` until the store marks them `failed` after 3 attempts
+
+## Migration Notes
+
+Reminder-related migrations:
+
+- `000017_create_reminders_table` creates reminder storage, foreign keys, and reminder lookup indexes
+- `000018_enforce_reminder_task_ownership` adds `(id, user_id)` uniqueness on tasks and a composite reminder-to-task foreign key
+- `000020_add_unique_logical_reminder_constraint` rejects duplicate logical reminder slots before adding the unique constraint

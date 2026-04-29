@@ -1,6 +1,6 @@
 # Remindr
 
-Remindr is a Go + PostgreSQL backend for user-owned tasks, tags, and reminder records.
+Remindr is a Go + PostgreSQL backend for user-owned tasks, tags, and reminder records. It exposes a versioned JSON API, stores all user data in PostgreSQL, and runs a lightweight reminder scheduler inside the API process.
 
 The API supports:
 
@@ -8,12 +8,14 @@ The API supports:
 - CRUD-style task management
 - tag management with per-user unique tag names
 - many-to-many task/tag relationships
-- reminder CRUD, persistence, and lifecycle state transitions
+- reminder CRUD, persistence, lifecycle state transitions, and background delivery processing
 
 Current reminder note:
 
 - authenticated reminder CRUD endpoints are available
-- reminder delivery runtime is not active yet
+- the reminder scheduler/worker runtime starts with the API process
+- due reminders are claimed in batches, sent by workers, and marked `sent` or retried
+- the default sender logs due reminders; plug in another `reminder.Sender` for email, SMS, push, webhooks, or any other transport
 - reminders are created explicitly through the reminder API; task creation does not automatically create reminders
 
 ## Tech Stack
@@ -38,7 +40,7 @@ Current reminder note:
 - `cmd/tokens` JWT creation and verification
 - `internal/store` persistence layer
 - `internal/db` database connection setup and migrations
-- `internal/reminder` reminder domain package and future runtime hooks
+- `internal/reminder` reminder domain package, scheduler, workers, and sender interface
 
 More detail:
 
@@ -64,6 +66,8 @@ Notes:
 
 ## Local Development
 
+Before starting the app, create a `.env` file with the environment variables above and point `DB_ADDR` at a reachable PostgreSQL database.
+
 ### Run with Air
 
 The development container uses Air and exposes the API on `localhost:8081`.
@@ -78,6 +82,12 @@ The container maps port `8081` on the host to `8080` in the app.
 
 ```bash
 go run ./cmd/api
+```
+
+Run tests:
+
+```bash
+go test ./...
 ```
 
 ## Migrations
@@ -155,6 +165,17 @@ The auth middleware:
 
 See [docs/api.md](docs/api.md) for request and query details.
 
+## Reminder Runtime
+
+When the API starts, `cmd/api/main.go` creates a reminder service with the default config:
+
+- scheduler interval: `30s`
+- claim batch size: `25`
+- worker count: `2`
+- queue size: same as the batch size
+
+The scheduler immediately claims due reminders, then repeats on the configured interval. Claimed reminders move from `pending` to `processing`; workers load each `processing` reminder, call the configured sender, then mark it `sent` on success. Failed sends are returned to `pending` until the third attempt, when the reminder is marked `failed`.
+
 ## Methodology
 
 - API-first resource design with JWT-protected user-owned data
@@ -165,5 +186,6 @@ See [docs/api.md](docs/api.md) for request and query details.
 
 ## Current Limitations
 
-- reminder runtime processing is not wired yet; the scheduler/worker/sender files are placeholders
+- default reminder delivery logs due reminders instead of sending through a real external transport
 - task status is currently independent from reminder status
+- reminder service tuning is currently hard-coded in `cmd/api/main.go` rather than exposed through environment variables
