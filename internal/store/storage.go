@@ -51,12 +51,16 @@ type TaskTags interface {
 }
 
 type Reminders interface {
-	CreateReminder(context.Context, *Reminder) error
-	CancelReminder(context.Context, uuid.UUID, uuid.UUID) error
-	ClaimDueReminders(context.Context, int64) ([]*Reminder, error)
-	MarkReminderSent(context.Context, uuid.UUID) error
-	MarkReminderFailed(context.Context, uuid.UUID, string) error
-	GetReminderForSending(context.Context, uuid.UUID) (*Reminder, error)
+	Create(context.Context, *Reminder) error
+	GetByID(context.Context, uuid.UUID, uuid.UUID) (*Reminder, error)
+	GetByTaskID(context.Context, uuid.UUID, uuid.UUID) ([]*Reminder, error)
+	UpdateByID(context.Context, uuid.UUID, uuid.UUID, *Reminder) error
+	DeleteByID(context.Context, uuid.UUID, uuid.UUID) error
+	CancelByID(context.Context, uuid.UUID, uuid.UUID) error
+	ClaimDue(context.Context, int64) ([]*Reminder, error)
+	MarkSentByID(context.Context, uuid.UUID) error
+	MarkFailedByID(context.Context, uuid.UUID, string) error
+	GetForSendingByID(context.Context, uuid.UUID) (*Reminder, error)
 }
 
 type Storage struct {

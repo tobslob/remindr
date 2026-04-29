@@ -70,6 +70,15 @@ func (app *application) mount() http.Handler {
 			r.Delete("/{id}", app.DeleteTagHandler)
 			r.Delete("/{task_id}/{id}", app.DetachTagFromTaskHandler)
 		})
+
+		r.Route("/reminders", func(r chi.Router) {
+			r.Use(app.AuthMiddleware)
+			r.Post("/", app.CreateReminderHandler)
+			r.Get("/task/{task_id}", app.GetRemindersByTaskIDHandler)
+			r.Get("/{id}", app.GetReminderByIDHandler)
+			r.Patch("/{id}", app.UpdateReminderByIDHandler)
+			r.Delete("/{id}", app.DeleteReminderByIDHandler)
+		})
 	})
 
 	return r
