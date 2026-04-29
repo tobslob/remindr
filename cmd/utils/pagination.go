@@ -160,11 +160,11 @@ func parseTaskStatusQuery(values url.Values, keys ...string) (*store.Status, err
 
 	normalizedStatus := normalizeEnumValue(rawValue, true)
 	switch store.Status(normalizedStatus) {
-	case store.Todo, store.InProgress, store.Done, store.Archived:
+	case store.Todo, store.InProgress, store.Done:
 		status := store.Status(normalizedStatus)
 		return &status, nil
 	default:
-		return nil, errors.New("status must be one of todo, in_progress, done, archived")
+		return nil, errors.New("status must be one of todo, in_progress, done")
 	}
 }
 

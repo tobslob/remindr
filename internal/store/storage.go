@@ -50,18 +50,31 @@ type TaskTags interface {
 	ReplaceTaskTags(context.Context, uuid.UUID, uuid.UUID, []uuid.UUID) error
 }
 
+type Reminders interface {
+	CreateReminder(context.Context, *Reminder) error
+	CancelReminder(context.Context, uuid.UUID, uuid.UUID) error
+	ClaimDueReminders(context.Context, int64) ([]*Reminder, error)
+	MarkReminderSent(context.Context, uuid.UUID) error
+	MarkReminderFailed(context.Context, uuid.UUID, string) error
+	GetReminderForSending(context.Context, uuid.UUID) (*Reminder, error)
+}
+
 type Storage struct {
+	db *sql.DB
 	Users
 	Tasks
 	Tags
 	TaskTags
+	Reminders
 }
 
 func NewStorage(db *sql.DB) *Storage {
 	return &Storage{
-		Users:    &UserStore{db: db},
-		Tasks:    &TaskStore{db: db},
-		Tags:     &TagStore{db: db},
-		TaskTags: &TaskTagStore{db: db},
+		db:        db,
+		Users:     &UserStore{db: db},
+		Tasks:     &TaskStore{db: db},
+		Tags:      &TagStore{db: db},
+		TaskTags:  &TaskTagStore{db: db},
+		Reminders: &ReminderStore{db: db},
 	}
 }

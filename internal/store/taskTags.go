@@ -67,7 +67,7 @@ func (s *TaskTagStore) ensureActiveTag(ctx context.Context, tx *sql.Tx, tagID uu
 }
 
 func (s *TaskTagStore) AttachTagToTask(ctx context.Context, userID uuid.UUID, taskTag *TaskTag) error {
-	query := `INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2) RETURNING task_id, tag_id, created_at`
+	query := `INSERT INTO task_tags (task_id, tag_id, user_id) VALUES ($1, $2, $3) RETURNING task_id, tag_id, created_at`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
@@ -91,11 +91,12 @@ func (s *TaskTagStore) AttachTagToTask(ctx context.Context, userID uuid.UUID, ta
 		query,
 		taskTag.TaskID,
 		taskTag.TagID,
+		userID,
 	).Scan(
 		&taskTag.TaskID,
-			&taskTag.TagID,
-			&taskTag.CreatedAt,
-		); err != nil {
+		&taskTag.TagID,
+		&taskTag.CreatedAt,
+	); err != nil {
 		return normalizeStoreError(err)
 	}
 
@@ -123,11 +124,10 @@ func (s *TaskTagStore) GetTagsByTaskIDs(ctx context.Context, taskIDs []uuid.UUID
 		t.color,
 		t.created_at
 	FROM task_tags tt
-	JOIN tasks tk ON tk.id = tt.task_id
-	JOIN tags t ON t.id = tt.tag_id
+	JOIN tasks tk ON tk.id = tt.task_id AND tk.user_id = tt.user_id
+	JOIN tags t ON t.id = tt.tag_id AND t.user_id = tt.user_id
 	WHERE tt.task_id = ANY($1)
-		AND tk.user_id = $2
-		AND t.user_id = $2
+		AND tt.user_id = $2
 		AND tk.deleted_at IS NULL
 		AND t.deleted_at IS NULL
 	ORDER BY tt.task_id, t.created_at ASC, t.id ASC;
@@ -164,7 +164,7 @@ func (s *TaskTagStore) GetTagsByTaskIDs(ctx context.Context, taskIDs []uuid.UUID
 }
 
 func (s *TaskTagStore) DetachTagFromTask(ctx context.Context, taskID uuid.UUID, tagID uuid.UUID, userID uuid.UUID) error {
-	query := `DELETE FROM task_tags WHERE task_id = $1 AND tag_id = $2`
+	query := `DELETE FROM task_tags WHERE task_id = $1 AND tag_id = $2 AND user_id = $3`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
@@ -179,7 +179,7 @@ func (s *TaskTagStore) DetachTagFromTask(ctx context.Context, taskID uuid.UUID, 
 		return err
 	}
 
-	res, err := tx.ExecContext(ctx, query, taskID, tagID)
+	res, err := tx.ExecContext(ctx, query, taskID, tagID, userID)
 	if err != nil {
 		return normalizeStoreError(err)
 	}
@@ -244,8 +244,9 @@ func (s *TaskTagStore) ReplaceTaskTags(ctx context.Context, taskID uuid.UUID, us
 
 		if _, err := tx.ExecContext(
 			ctx,
-			`DELETE FROM task_tags WHERE task_id = $1 AND NOT (tag_id = ANY($2))`,
+			`DELETE FROM task_tags WHERE task_id = $1 AND user_id = $2 AND NOT (tag_id = ANY($3))`,
 			taskID,
+			userID,
 			pq.Array(tagIDs),
 		); err != nil {
 			return normalizeStoreError(err)
@@ -253,17 +254,18 @@ func (s *TaskTagStore) ReplaceTaskTags(ctx context.Context, taskID uuid.UUID, us
 
 		if _, err := tx.ExecContext(
 			ctx,
-			`INSERT INTO task_tags (task_id, tag_id)
-			 SELECT $1, u.tag_id
-			 FROM unnest($2::uuid[]) AS u(tag_id)
+			`INSERT INTO task_tags (task_id, tag_id, user_id)
+			 SELECT $1, u.tag_id, $2
+			 FROM unnest($3::uuid[]) AS u(tag_id)
 			 ON CONFLICT (task_id, tag_id) DO NOTHING`,
 			taskID,
+			userID,
 			pq.Array(tagIDs),
 		); err != nil {
 			return normalizeStoreError(err)
 		}
 	} else {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM task_tags WHERE task_id = $1`, taskID); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM task_tags WHERE task_id = $1 AND user_id = $2`, taskID, userID); err != nil {
 			return normalizeStoreError(err)
 		}
 	}
@@ -289,11 +291,10 @@ func (s *TaskTagStore) GetTasksByTagID(ctx context.Context, tagID uuid.UUID, use
 		tk.updated_at,
 		tk.completed_at
 	FROM task_tags tt
-	JOIN tasks tk ON tk.id = tt.task_id
-	JOIN tags t ON t.id = tt.tag_id
+	JOIN tasks tk ON tk.id = tt.task_id AND tk.user_id = tt.user_id
+	JOIN tags t ON t.id = tt.tag_id AND t.user_id = tt.user_id
 	WHERE tt.tag_id = $1
-		AND tk.user_id = $2
-		AND t.user_id = $2
+		AND tt.user_id = $2
 		AND tk.deleted_at IS NULL
 		AND t.deleted_at IS NULL
 	ORDER BY tk.created_at DESC, tk.id DESC;

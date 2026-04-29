@@ -20,7 +20,6 @@ const (
 	Todo       Status = "todo"
 	InProgress Status = "in_progress"
 	Done       Status = "done"
-	Archived   Status = "archived"
 )
 
 type Task struct {
@@ -68,7 +67,7 @@ type TasksPage struct {
 }
 
 func (s *TaskStore) Create(ctx context.Context, task *Task) error {
-	query := `INSERT INTO tasks (user_id, title, description, status, priority, due_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at`
+	query := `INSERT INTO tasks (user_id, title, description, status, priority, due_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at, updated_at`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
@@ -85,8 +84,9 @@ func (s *TaskStore) Create(ctx context.Context, task *Task) error {
 	).Scan(
 		&task.ID,
 		&task.CreatedAt,
+		&task.UpdatedAt,
 	); err != nil {
-		return err
+		return normalizeStoreError(err)
 	}
 	return nil
 }
@@ -113,7 +113,7 @@ func (s *TaskStore) GetByID(ctx context.Context, id uuid.UUID, userID uuid.UUID)
 		if err == sql.ErrNoRows {
 			return nil, ErrNotFound
 		}
-		return nil, err
+		return nil, normalizeStoreError(err)
 	}
 
 	return task, nil
@@ -167,7 +167,7 @@ func (s *TaskStore) GetTasks(ctx context.Context, userID uuid.UUID, filter TaskF
 
 	rows, err := s.db.QueryContext(ctx, query, append(args, filter.Limit+1)...)
 	if err != nil {
-		return nil, err
+		return nil, normalizeStoreError(err)
 	}
 	defer rows.Close()
 
@@ -186,13 +186,13 @@ func (s *TaskStore) GetTasks(ctx context.Context, userID uuid.UUID, filter TaskF
 			&task.UpdatedAt,
 			&task.CompletedAt,
 		); err != nil {
-			return nil, err
+			return nil, normalizeStoreError(err)
 		}
 		tasks = append(tasks, task)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, normalizeStoreError(err)
 	}
 
 	hasMore := len(tasks) > filter.Limit
@@ -237,79 +237,129 @@ func (s *TaskStore) getTaskCursorCreatedAt(ctx context.Context, userID uuid.UUID
 		if err == sql.ErrNoRows {
 			return time.Time{}, ErrInvalidCursor
 		}
-		return time.Time{}, err
+		return time.Time{}, normalizeStoreError(err)
 	}
 
 	return createdAt, nil
 }
 
-func (s *TaskStore) DeleteByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
-	query := `UPDATE tasks SET deleted_at = NOW() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`
+func softDeleteTasks(ctx context.Context, tx *sql.Tx, query string, args ...any) ([]uuid.UUID, error) {
+	rows, err := tx.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, normalizeStoreError(err)
+	}
+	defer rows.Close()
 
+	var taskIDs []uuid.UUID
+	for rows.Next() {
+		var taskID uuid.UUID
+		if err := rows.Scan(&taskID); err != nil {
+			return nil, normalizeStoreError(err)
+		}
+		taskIDs = append(taskIDs, taskID)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, normalizeStoreError(err)
+	}
+
+	if len(taskIDs) == 0 {
+		return nil, ErrNotFound
+	}
+
+	return taskIDs, nil
+}
+
+func deleteRemindersForTaskIDs(ctx context.Context, tx *sql.Tx, taskIDs []uuid.UUID) error {
+	if len(taskIDs) == 0 {
+		return nil
+	}
+
+	_, err := tx.ExecContext(ctx, `DELETE FROM reminders WHERE task_id = ANY($1)`, pq.Array(taskIDs))
+	return normalizeStoreError(err)
+}
+
+func (s *TaskStore) DeleteByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	res, err := s.db.ExecContext(ctx, query, id, userID)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return normalizeStoreError(err)
 	}
+	defer tx.Rollback()
 
-	rowsAffected, err := res.RowsAffected()
+	taskIDs, err := softDeleteTasks(
+		ctx,
+		tx,
+		`UPDATE tasks SET deleted_at = NOW() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL RETURNING id`,
+		id,
+		userID,
+	)
 	if err != nil {
-		return err
+		return normalizeStoreError(err)
 	}
 
-	if rowsAffected == 0 {
-		return ErrNotFound
+	if err := deleteRemindersForTaskIDs(ctx, tx, taskIDs); err != nil {
+		return normalizeStoreError(err)
 	}
 
-	return nil
+	return normalizeStoreError(tx.Commit())
 }
 
 func (s *TaskStore) DeleteAllByUserID(ctx context.Context, userID uuid.UUID) error {
-	query := `UPDATE tasks SET deleted_at = NOW() WHERE user_id = $1 AND deleted_at IS NULL`
-
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	res, err := s.db.ExecContext(ctx, query, userID)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return normalizeStoreError(err)
 	}
+	defer tx.Rollback()
 
-	rowsAffected, err := res.RowsAffected()
+	taskIDs, err := softDeleteTasks(
+		ctx,
+		tx,
+		`UPDATE tasks SET deleted_at = NOW() WHERE user_id = $1 AND deleted_at IS NULL RETURNING id`,
+		userID,
+	)
 	if err != nil {
-		return err
+		return normalizeStoreError(err)
 	}
 
-	if rowsAffected == 0 {
-		return ErrNotFound
+	if err := deleteRemindersForTaskIDs(ctx, tx, taskIDs); err != nil {
+		return normalizeStoreError(err)
 	}
 
-	return nil
+	return normalizeStoreError(tx.Commit())
 }
 
 func (s *TaskStore) DeleteByIDs(ctx context.Context, ids []uuid.UUID, userID uuid.UUID) error {
-	query := `UPDATE tasks SET deleted_at = NOW() WHERE id = ANY($1) AND user_id = $2 AND deleted_at IS NULL`
-
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	res, err := s.db.ExecContext(ctx, query, pq.Array(ids), userID)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return normalizeStoreError(err)
 	}
+	defer tx.Rollback()
 
-	rowsAffected, err := res.RowsAffected()
+	taskIDs, err := softDeleteTasks(
+		ctx,
+		tx,
+		`UPDATE tasks SET deleted_at = NOW() WHERE id = ANY($1) AND user_id = $2 AND deleted_at IS NULL RETURNING id`,
+		pq.Array(ids),
+		userID,
+	)
 	if err != nil {
-		return err
+		return normalizeStoreError(err)
 	}
 
-	if rowsAffected == 0 {
-		return ErrNotFound
+	if err := deleteRemindersForTaskIDs(ctx, tx, taskIDs); err != nil {
+		return normalizeStoreError(err)
 	}
 
-	return nil
+	return normalizeStoreError(tx.Commit())
 }
 
 func (s *TaskStore) UpdateByID(ctx context.Context, userID uuid.UUID, task *Task) error {
@@ -329,12 +379,12 @@ func (s *TaskStore) UpdateByID(ctx context.Context, userID uuid.UUID, task *Task
 		task.UserID,
 	)
 	if err != nil {
-		return err
+		return normalizeStoreError(err)
 	}
 
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		return err
+		return normalizeStoreError(err)
 	}
 
 	if rowsAffected == 0 {

@@ -10,10 +10,10 @@ import (
 )
 
 type CreateTaskPayload struct {
-	Title       string     `json:"title" validate:"required"`
-	Description string     `json:"description" validate:"required"`
-	Priority    *string    `json:"priority" validate:"omitempty,oneof=low medium high"`
-	DueAt       time.Time  `json:"due_at" validate:"required"`
+	Title       string    `json:"title" validate:"required"`
+	Description string    `json:"description" validate:"required"`
+	Priority    *string   `json:"priority" validate:"omitempty,oneof=low medium high"`
+	DueAt       time.Time `json:"due_at" validate:"required"`
 }
 
 type UpdateTaskPayload struct {
