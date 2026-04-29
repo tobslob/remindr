@@ -11,7 +11,7 @@ Important fields:
 - `id`
 - `username`
 - `email`
-- `password_hash`
+- `password`
 - `created_at`
 - `updated_at`
 
@@ -157,6 +157,6 @@ The schema and store support reminders, but the runtime processing loop is not i
 
 That means:
 
-- reminder rows can be stored and constrained correctly
+- reminder rows can be created, updated, deleted, and constrained correctly
 - claim/send lifecycle methods exist in the store
 - scheduler/worker/sender runtime components are still placeholders

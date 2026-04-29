@@ -251,6 +251,61 @@ Returns tasks associated with one tag.
 
 Detaches tag `{id}` from task `{task_id}`.
 
+## Reminders
+
+### `POST /reminders/`
+
+Creates a reminder for a task owned by the authenticated user.
+
+Request body:
+
+```json
+{
+  "task_id": "11111111-1111-1111-1111-111111111111",
+  "type": "due_now",
+  "remind_at": "2026-05-01T09:00:00Z"
+}
+```
+
+Notes:
+
+- `task_id`, `type`, and `remind_at` are required
+- `type` must be one of `before_due` or `due_now`
+- `remind_at` must be in the future
+- the authenticated user is used as the reminder owner; the client does not supply `user_id`
+- new reminders begin in the `pending` lifecycle state
+- duplicate logical reminders are rejected if `(task_id, user_id, type, remind_at)` already exists
+
+### `GET /reminders/task/{task_id}`
+
+Returns all reminders for a task owned by the authenticated user.
+
+### `GET /reminders/{id}`
+
+Returns one reminder by ID for the authenticated user.
+
+### `PATCH /reminders/{id}`
+
+Updates a reminder.
+
+Request body fields are optional:
+
+```json
+{
+  "type": "before_due",
+  "remind_at": "2026-06-01T10:00:00Z"
+}
+```
+
+Notes:
+
+- if provided, `type` must be one of `before_due` or `due_now`
+- if provided, `remind_at` must be in the future
+
+### `DELETE /reminders/{id}`
+
+Deletes a reminder owned by the authenticated user.
+
 ## Error Behavior
 
 Typical mappings:

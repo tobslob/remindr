@@ -8,12 +8,13 @@ The API supports:
 - CRUD-style task management
 - tag management with per-user unique tag names
 - many-to-many task/tag relationships
-- reminder persistence and lifecycle state transitions
+- reminder CRUD, persistence, and lifecycle state transitions
 
 Current reminder note:
 
-- reminder rows and constraints are implemented in the database and store layer
-- the runtime reminder scheduler/worker/sender packages are still stubs, so reminders are not automatically created or dispatched yet
+- authenticated reminder CRUD endpoints are available
+- reminder delivery runtime is not active yet
+- reminders are created explicitly through the reminder API; task creation does not automatically create reminders
 
 ## Tech Stack
 
@@ -22,6 +23,13 @@ Current reminder note:
 - `chi` router
 - JWT auth
 - SQL migrations via `golang-migrate`
+
+## Development Tools
+
+- Docker Compose for local service orchestration
+- Air for local live reload in the development container
+- `make` targets for migration workflows
+- Postman or any HTTP client for API testing
 
 ## Project Layout
 
@@ -137,19 +145,25 @@ The auth middleware:
 - `DELETE /v1/tags/{id}`
 - `DELETE /v1/tags/{task_id}/{id}`
 
+### Authenticated reminders
+
+- `POST /v1/reminders/`
+- `GET /v1/reminders/task/{task_id}`
+- `GET /v1/reminders/{id}`
+- `PATCH /v1/reminders/{id}`
+- `DELETE /v1/reminders/{id}`
+
 See [docs/api.md](docs/api.md) for request and query details.
 
-## Implementation Highlights
+## Methodology
 
-- tasks are soft-deleted with `deleted_at`
-- deleting tasks also deletes their reminder rows in the same transaction
-- tags are soft-deleted and keep unique name ownership per user
-- task/tag joins are tenant-scoped both in store logic and the database
-- reminders are tenant-scoped both in store logic and the database
-- duplicate logical reminders are blocked by a unique constraint on `(task_id, user_id, type, remind_at)`
+- API-first resource design with JWT-protected user-owned data
+- user-scoped ownership rules for tasks, tags, task-tag relationships, and reminders
+- soft-delete strategy for tasks and tags
+- explicit reminder management instead of implicit task-side reminder creation
+- database-backed integrity rules for uniqueness and ownership boundaries
 
 ## Current Limitations
 
 - reminder runtime processing is not wired yet; the scheduler/worker/sender files are placeholders
 - task status is currently independent from reminder status
-- reminder creation is available in the store layer, but no API endpoint or automatic task-side creation currently invokes it

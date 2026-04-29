@@ -10,6 +10,14 @@ Remindr is organized as a layered HTTP application:
 4. `internal/db` manages connection setup and schema migrations
 5. `internal/reminder` holds reminder domain types and future runtime components
 
+## Design Methodology
+
+- API-first design with resource-oriented routes under `/v1`
+- ownership-first data modeling so every task, tag, task-tag relationship, and reminder belongs to a user
+- soft-delete policy for long-lived resources where recovery may matter
+- explicit reminder management rather than coupling reminder creation to task creation
+- database constraints used to reinforce ownership and uniqueness rules
+
 ## Request Flow
 
 ### Public endpoints
@@ -102,6 +110,7 @@ The current API style is:
 
 What exists today:
 
+- authenticated reminder CRUD handlers in [`cmd/api/reminder.go`](../cmd/api/reminder.go)
 - reminder persistence
 - reminder cancellation
 - claim-due batch transition from `pending` to `processing`
@@ -125,15 +134,13 @@ Those future runtime components have placeholder files in:
 
 ## Integrity Strategy
 
-The project uses both app-level and DB-level protection.
+The project uses both application-level checks and database constraints.
 
 Examples:
 
-- task/tag tenant ownership is enforced in handler/store logic and by composite foreign keys
-- reminder/task tenant ownership is enforced in store logic and by composite foreign keys
-- duplicate logical reminders are blocked by a unique DB constraint
-
-This avoids relying only on handler correctness.
+- task/tag ownership is enforced by authenticated request flow and schema rules
+- reminder/task ownership is enforced by authenticated request flow and schema rules
+- duplicate logical reminders are rejected as part of the data model
 
 ## Runtime and Deployment
 
