@@ -106,30 +106,33 @@ func (s *UserStore) DeleteByID(ctx context.Context, id uuid.UUID) error {
 }
 
 func (s *UserStore) UpdateByID(ctx context.Context, user *User) error {
-	query := `UPDATE users SET username = $1, email = $2, password = $3, updated_at = NOW() WHERE id = $4`
+	query := `UPDATE users
+	SET username = $1,
+	    email = $2,
+	    password = $3,
+	    updated_at = NOW()
+	WHERE id = $4
+	RETURNING id, username, email, password, created_at, updated_at`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	res, err := s.db.ExecContext(
+	if err := s.db.QueryRowContext(
 		ctx,
 		query,
 		user.Username,
 		user.Email,
 		user.Password,
 		user.ID,
-	)
-	if err != nil {
+	).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email,
+		&user.Password,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	); err != nil {
 		return normalizeStoreError(err)
-	}
-
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rowsAffected == 0 {
-		return ErrNotFound
 	}
 
 	return nil

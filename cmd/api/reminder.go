@@ -224,17 +224,7 @@ func (app *application) UpdateReminderByIDHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	refreshedReminder, err := app.store.Reminders.GetByID(ctx, reminderID, user.ID)
-	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			utils.NotFoundError(w, r, err)
-			return
-		}
-		utils.InternalServerError(w, r, err)
-		return
-	}
-
-	if err := utils.JsonResponse(w, http.StatusOK, refreshedReminder); err != nil {
+	if err := utils.JsonResponse(w, http.StatusOK, updatedReminder); err != nil {
 		utils.InternalServerError(w, r, err)
 	}
 }

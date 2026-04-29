@@ -127,22 +127,26 @@ func (s *TagStore) DeleteByID(ctx context.Context, id uuid.UUID, userID uuid.UUI
 }
 
 func (s *TagStore) UpdateByID(ctx context.Context, id uuid.UUID, tag *Tag) error {
-	query := `UPDATE tags SET name = $1, color = $2, updated_at = NOW() WHERE id = $3 AND user_id = $4 AND deleted_at IS NULL`
+	query := `UPDATE tags
+	SET name = $1,
+	    color = $2,
+	    updated_at = NOW()
+	WHERE id = $3 AND user_id = $4 AND deleted_at IS NULL
+	RETURNING id, user_id, name, color, created_at, updated_at, deleted_at`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	result, err := s.db.ExecContext(ctx, query, tag.Name, tag.Color, id, tag.UserID)
-	if err != nil {
+	if err := s.db.QueryRowContext(ctx, query, tag.Name, tag.Color, id, tag.UserID).Scan(
+		&tag.ID,
+		&tag.UserID,
+		&tag.Name,
+		&tag.Color,
+		&tag.CreatedAt,
+		&tag.UpdatedAt,
+		&tag.DeletedAt,
+	); err != nil {
 		return normalizeStoreError(err)
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rowsAffected == 0 {
-		return ErrNotFound
 	}
 
 	return nil

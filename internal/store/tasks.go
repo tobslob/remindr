@@ -363,12 +363,19 @@ func (s *TaskStore) DeleteByIDs(ctx context.Context, ids []uuid.UUID, userID uui
 }
 
 func (s *TaskStore) UpdateByID(ctx context.Context, userID uuid.UUID, task *Task) error {
-	query := `UPDATE tasks SET title = $1, description = $2, priority = $3, due_at = $4, updated_at = NOW() WHERE id = $5 AND user_id = $6 AND deleted_at IS NULL`
+	query := `UPDATE tasks
+	SET title = $1,
+	    description = $2,
+	    priority = $3,
+	    due_at = $4,
+	    updated_at = NOW()
+	WHERE id = $5 AND user_id = $6 AND deleted_at IS NULL
+	RETURNING id, user_id, title, description, status, priority, due_at, created_at, updated_at, completed_at, deleted_at`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	res, err := s.db.ExecContext(
+	if err := s.db.QueryRowContext(
 		ctx,
 		query,
 		task.Title,
@@ -376,19 +383,21 @@ func (s *TaskStore) UpdateByID(ctx context.Context, userID uuid.UUID, task *Task
 		task.Priority,
 		task.DueAt,
 		task.ID,
-		task.UserID,
-	)
-	if err != nil {
+		userID,
+	).Scan(
+		&task.ID,
+		&task.UserID,
+		&task.Title,
+		&task.Description,
+		&task.Status,
+		&task.Priority,
+		&task.DueAt,
+		&task.CreatedAt,
+		&task.UpdatedAt,
+		&task.CompletedAt,
+		&task.DeletedAt,
+	); err != nil {
 		return normalizeStoreError(err)
-	}
-
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return normalizeStoreError(err)
-	}
-
-	if rowsAffected == 0 {
-		return ErrNotFound
 	}
 
 	return nil

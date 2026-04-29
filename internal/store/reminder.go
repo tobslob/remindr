@@ -150,7 +150,7 @@ func (s *ReminderStore) UpdateByID(ctx context.Context, id uuid.UUID, userID uui
 	    remind_at = $4,
 	    updated_at = now()
 	WHERE id = $1 AND user_id = $2
-	RETURNING updated_at`
+	RETURNING id, task_id, user_id, type, status, remind_at, attempts, last_attempt_error, sent_at, created_at, updated_at`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
@@ -162,7 +162,19 @@ func (s *ReminderStore) UpdateByID(ctx context.Context, id uuid.UUID, userID uui
 		userID,
 		r.Type,
 		r.RemindAt,
-	).Scan(&r.UpdatedAt); err != nil {
+	).Scan(
+		&r.ID,
+		&r.TaskID,
+		&r.UserID,
+		&r.Type,
+		&r.Status,
+		&r.RemindAt,
+		&r.Attempts,
+		&r.LastAttemptError,
+		&r.SentAt,
+		&r.CreatedAt,
+		&r.UpdatedAt,
+	); err != nil {
 		return normalizeStoreError(err)
 	}
 

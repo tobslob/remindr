@@ -248,13 +248,7 @@ func (app *application) UpdateTaskHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	updatedItem, err := app.store.Tasks.GetByID(ctx, taskID, user.ID)
-	if err != nil {
-		utils.InternalServerError(w, r, err)
-		return
-	}
-
-	if err := utils.JsonResponse(w, http.StatusOK, updatedItem); err != nil {
+	if err := utils.JsonResponse(w, http.StatusOK, item); err != nil {
 		utils.InternalServerError(w, r, err)
 	}
 }
