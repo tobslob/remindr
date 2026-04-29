@@ -118,12 +118,6 @@ The migration files live in `internal/db/migrations`.
 - `POST /v1/users/login` returns a JWT
 - authenticated routes require `Authorization: Bearer <token>`
 
-The auth middleware:
-
-- verifies the token
-- loads the user from the database
-- stores the user in request context
-
 ## API Summary
 
 ### Public
@@ -164,17 +158,6 @@ The auth middleware:
 - `DELETE /v1/reminders/{id}`
 
 See [docs/api.md](docs/api.md) for request and query details.
-
-## Reminder Runtime
-
-When the API starts, `cmd/api/main.go` creates a reminder service with the default config:
-
-- scheduler interval: `30s`
-- claim batch size: `25`
-- worker count: `2`
-- queue size: same as the batch size
-
-The scheduler immediately claims due reminders, then repeats on the configured interval. Claimed reminders move from `pending` to `processing`; workers load each `processing` reminder, call the configured sender, then mark it `sent` on success. Failed sends are returned to `pending` until the third attempt, when the reminder is marked `failed`.
 
 ## Methodology
 
