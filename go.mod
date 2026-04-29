@@ -1,4 +1,4 @@
-module github.com/tobslob/todoApp
+module github.com/tobslob/remindr
 
 go 1.26.0
 

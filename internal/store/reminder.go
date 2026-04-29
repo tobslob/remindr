@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tobslob/todoApp/internal/reminder"
+	"github.com/tobslob/remindr/internal/reminder"
 )
 
 type ReminderStore struct {

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/tobslob/todoApp/cmd/tokens"
-	"github.com/tobslob/todoApp/internal/db"
-	"github.com/tobslob/todoApp/internal/env"
-	"github.com/tobslob/todoApp/internal/store"
+	"github.com/tobslob/remindr/cmd/tokens"
+	"github.com/tobslob/remindr/internal/db"
+	"github.com/tobslob/remindr/internal/env"
+	"github.com/tobslob/remindr/internal/store"
 )
 
 func main() {

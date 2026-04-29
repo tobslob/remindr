@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/tobslob/todoApp/cmd/utils"
-	"github.com/tobslob/todoApp/internal/store"
+	"github.com/tobslob/remindr/cmd/utils"
+	"github.com/tobslob/remindr/internal/store"
 )
 
 type ReplaceTaskTagsPayload struct {

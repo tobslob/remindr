@@ -1,0 +1,170 @@
+# Architecture
+
+## Overview
+
+Remindr is organized as a layered HTTP application:
+
+1. `cmd/api` receives and validates HTTP requests
+2. `cmd/tokens` handles JWT signing and verification
+3. `internal/store` performs database reads and writes
+4. `internal/db` manages connection setup and schema migrations
+5. `internal/reminder` holds reminder domain types and future runtime components
+
+## Request Flow
+
+### Public endpoints
+
+- request enters `chi` router in [`cmd/api/api.go`](../cmd/api/api.go)
+- handler validates JSON and calls the appropriate store method
+- handler writes JSON response via [`cmd/utils/json.go`](../cmd/utils/json.go)
+
+### Authenticated endpoints
+
+- `AuthMiddleware` in [`cmd/api/middlewares.go`](../cmd/api/middlewares.go)
+- parses `Authorization` header
+- verifies JWT through [`cmd/tokens/jwt.go`](../cmd/tokens/jwt.go)
+- loads the user from the store
+- injects the user into context via [`internal/requestctx/user.go`](../internal/requestctx/user.go)
+
+## Store Layer
+
+`Storage` in [`internal/store/storage.go`](../internal/store/storage.go) aggregates interfaces for:
+
+- `Users`
+- `Tasks`
+- `Tags`
+- `TaskTags`
+- `Reminders`
+
+Each concrete store uses `database/sql` directly and normalizes common DB errors with [`internal/store/errors.go`](../internal/store/errors.go).
+
+## Users
+
+[`internal/store/users.go`](../internal/store/users.go)
+
+- users are hard-deleted
+- email lookup powers login
+- uniqueness conflicts map to `ErrConflict`
+
+## Tasks
+
+[`internal/store/tasks.go`](../internal/store/tasks.go)
+
+Key behavior:
+
+- tasks belong to a user
+- tasks are soft-deleted with `deleted_at`
+- task listing supports search, status, priority, created/due/completed time windows, and cursor pagination
+- deleting tasks also deletes associated reminders in the same transaction
+
+### Pagination
+
+Task listing uses cursor pagination:
+
+- ordered by `created_at DESC, id DESC`
+- accepts `last_id`
+- returns `next_last_id` when more rows are available
+
+The parsing logic lives in [`cmd/utils/pagination.go`](../cmd/utils/pagination.go).
+
+## Tags
+
+[`internal/store/tags.go`](../internal/store/tags.go)
+
+Key behavior:
+
+- tags belong to a user
+- tags are soft-deleted
+- tag names are unique per user
+- soft-deleted tags still reserve the name, which supports future undo/restore semantics
+
+## Task/Tag Relationships
+
+[`internal/store/taskTags.go`](../internal/store/taskTags.go)
+
+Key behavior:
+
+- many-to-many relationship between tasks and tags
+- join rows are hard-deleted when detached
+- attach, detach, and replace operations serialize per task with row locking
+- ownership is enforced in both store logic and the database
+
+The current API style is:
+
+- attach one tag to one task
+- replace the complete tag set for a task
+- fetch tags for one or many tasks
+- fetch tasks for one tag
+
+## Reminders
+
+[`internal/store/reminder.go`](../internal/store/reminder.go)
+
+What exists today:
+
+- reminder persistence
+- reminder cancellation
+- claim-due batch transition from `pending` to `processing`
+- mark reminder `sent`
+- mark reminder back to `pending` or `failed`
+- fetch one `processing` reminder for sending
+
+What does not exist yet:
+
+- scheduler loop
+- worker orchestration
+- transport sender implementation
+- automatic reminder creation from task flows
+
+Those future runtime components have placeholder files in:
+
+- [`internal/reminder/scheduler.go`](../internal/reminder/scheduler.go)
+- [`internal/reminder/service.go`](../internal/reminder/service.go)
+- [`internal/reminder/worker.go`](../internal/reminder/worker.go)
+- [`internal/reminder/sender.go`](../internal/reminder/sender.go)
+
+## Integrity Strategy
+
+The project uses both app-level and DB-level protection.
+
+Examples:
+
+- task/tag tenant ownership is enforced in handler/store logic and by composite foreign keys
+- reminder/task tenant ownership is enforced in store logic and by composite foreign keys
+- duplicate logical reminders are blocked by a unique DB constraint
+
+This avoids relying only on handler correctness.
+
+## Runtime and Deployment
+
+[`cmd/api/main.go`](../cmd/api/main.go) wires:
+
+- env loading
+- DB connection pool setup
+- JWT maker creation
+- store construction
+- HTTP server startup
+
+Development container support:
+
+- [`Dockerfile.dev`](../Dockerfile.dev)
+- [`docker-compose.yml`](../docker-compose.yml)
+
+## Error Handling Conventions
+
+- `ErrNotFound` for missing resources
+- `ErrConflict` for uniqueness violations
+- `ErrInvalidCursor` for invalid pagination cursors
+
+Handlers map those store errors to HTTP responses through:
+
+- [`cmd/utils/errors.go`](../cmd/utils/errors.go)
+
+## Testing Status
+
+Current automated coverage is light.
+
+- there is at least one utility test file: [`cmd/utils/pagination_test.go`](../cmd/utils/pagination_test.go)
+- store and reminder runtime packages do not currently have dedicated behavior tests
+
+That means a lot of implementation confidence currently comes from `go test ./...` compile safety plus manual store review rather than broad end-to-end tests.

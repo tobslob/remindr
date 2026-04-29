@@ -7,8 +7,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/tobslob/todoApp/cmd/tokens"
-	"github.com/tobslob/todoApp/internal/store"
+	"github.com/tobslob/remindr/cmd/tokens"
+	"github.com/tobslob/remindr/internal/store"
 )
 
 type application struct {

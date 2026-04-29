@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tobslob/todoApp/internal/store"
+	"github.com/tobslob/remindr/internal/store"
 )
 
 func TestGetTaskListQueryParsesSearchAndRanges(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tobslob/todoApp/internal/store"
+	"github.com/tobslob/remindr/internal/store"
 )
 
 const (

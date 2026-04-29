@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/tobslob/todoApp/cmd/utils"
-	"github.com/tobslob/todoApp/internal/requestctx"
+	"github.com/tobslob/remindr/cmd/utils"
+	"github.com/tobslob/remindr/internal/requestctx"
 )
 
 func (app *application) AuthMiddleware(next http.Handler) http.Handler {
